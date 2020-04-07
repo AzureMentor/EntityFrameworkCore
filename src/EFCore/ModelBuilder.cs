@@ -1,8 +1,10 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
 using System.ComponentModel;
+using System.Linq;
+using System.Reflection;
 using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -24,7 +26,7 @@ namespace Microsoft.EntityFrameworkCore
     ///         model externally and set it on a <see cref="DbContextOptions" /> instance that is passed to the context constructor.
     ///     </para>
     /// </summary>
-    public class ModelBuilder : IInfrastructure<InternalModelBuilder>
+    public class ModelBuilder : IInfrastructure<IConventionModelBuilder>
     {
         private readonly InternalModelBuilder _builder;
 
@@ -38,6 +40,21 @@ namespace Microsoft.EntityFrameworkCore
             Check.NotNull(conventions, nameof(conventions));
 
             _builder = new InternalModelBuilder(new Model(conventions));
+
+            _builder.Metadata.SetProductVersion(ProductInfo.GetVersion());
+        }
+
+        /// <summary>
+        ///     <para>
+        ///         Initializes a new instance of the <see cref="ModelBuilder" /> class with no conventions.
+        ///     </para>
+        ///     <para>
+        ///         Warning: conventions are typically needed to build a correct model.
+        ///     </para>
+        /// </summary>
+        public ModelBuilder()
+        {
+            _builder = new Model().Builder;
         }
 
         /// <summary>
@@ -71,7 +88,7 @@ namespace Microsoft.EntityFrameworkCore
         ///         application code.
         ///     </para>
         /// </summary>
-        InternalModelBuilder IInfrastructure<InternalModelBuilder>.Instance => _builder;
+        IConventionModelBuilder IInfrastructure<IConventionModelBuilder>.Instance => _builder;
 
         /// <summary>
         ///     Returns an object that can be used to configure a given entity type in the model.
@@ -81,7 +98,7 @@ namespace Microsoft.EntityFrameworkCore
         /// <returns> An object that can be used to configure the entity type. </returns>
         public virtual EntityTypeBuilder<TEntity> Entity<TEntity>()
             where TEntity : class
-            => new EntityTypeBuilder<TEntity>(Builder.Entity(typeof(TEntity), ConfigurationSource.Explicit, throwOnQuery: true));
+            => new EntityTypeBuilder<TEntity>(Builder.Entity(typeof(TEntity), ConfigurationSource.Explicit).Metadata);
 
         /// <summary>
         ///     Returns an object that can be used to configure a given entity type in the model.
@@ -93,7 +110,7 @@ namespace Microsoft.EntityFrameworkCore
         {
             Check.NotNull(type, nameof(type));
 
-            return new EntityTypeBuilder(Builder.Entity(type, ConfigurationSource.Explicit, throwOnQuery: true));
+            return new EntityTypeBuilder(Builder.Entity(type, ConfigurationSource.Explicit).Metadata);
         }
 
         /// <summary>
@@ -107,7 +124,7 @@ namespace Microsoft.EntityFrameworkCore
         {
             Check.NotEmpty(name, nameof(name));
 
-            return new EntityTypeBuilder(Builder.Entity(name, ConfigurationSource.Explicit, throwOnQuery: true));
+            return new EntityTypeBuilder(Builder.Entity(name, ConfigurationSource.Explicit).Metadata);
         }
 
         /// <summary>
@@ -190,81 +207,6 @@ namespace Microsoft.EntityFrameworkCore
         }
 
         /// <summary>
-        ///     Returns an object that can be used to configure a given query type in the model.
-        ///     If the query type is not already part of the model, it will be added to the model.
-        /// </summary>
-        /// <typeparam name="TQuery"> The query type to be configured. </typeparam>
-        /// <returns> An object that can be used to configure the query type. </returns>
-        public virtual QueryTypeBuilder<TQuery> Query<TQuery>()
-            where TQuery : class
-            => new QueryTypeBuilder<TQuery>(Builder.Query(typeof(TQuery), ConfigurationSource.Explicit));
-
-        /// <summary>
-        ///     Returns an object that can be used to configure a given query type in the model.
-        ///     If the query type is not already part of the model, it will be added to the model.
-        /// </summary>
-        /// <param name="type"> The query type to be configured. </param>
-        /// <returns> An object that can be used to configure the query type. </returns>
-        public virtual QueryTypeBuilder Query([NotNull] Type type)
-        {
-            Check.NotNull(type, nameof(type));
-
-            return new QueryTypeBuilder(Builder.Query(type, ConfigurationSource.Explicit));
-        }
-
-        /// <summary>
-        ///     <para>
-        ///         Performs configuration of a given query type in the model. If the query type is not already part
-        ///         of the model, it will be added to the model.
-        ///     </para>
-        ///     <para>
-        ///         This overload allows configuration of the query type to be done in line in the method call rather
-        ///         than being chained after a call to <see cref="Query{TQuery}()" />. This allows additional
-        ///         configuration at the model level to be chained after configuration for the query type.
-        ///     </para>
-        /// </summary>
-        /// <typeparam name="TQuery"> The query type to be configured. </typeparam>
-        /// <param name="buildAction"> An action that performs configuration of the query type. </param>
-        /// <returns>
-        ///     The same <see cref="ModelBuilder" /> instance so that additional configuration calls can be chained.
-        /// </returns>
-        public virtual ModelBuilder Query<TQuery>([NotNull] Action<QueryTypeBuilder<TQuery>> buildAction)
-            where TQuery : class
-        {
-            Check.NotNull(buildAction, nameof(buildAction));
-
-            buildAction(Query<TQuery>());
-
-            return this;
-        }
-
-        /// <summary>
-        ///     <para>
-        ///         Performs configuration of a given query type in the model. If the query type is not already part
-        ///         of the model, it will be added to the model.
-        ///     </para>
-        ///     <para>
-        ///         This overload allows configuration of the query type to be done in line in the method call rather
-        ///         than being chained after a call to <see cref="Query{TQuery}()" />. This allows additional
-        ///         configuration at the model level to be chained after configuration for the query type.
-        ///     </para>
-        /// </summary>
-        /// <param name="type"> The query type to be configured. </param>
-        /// <param name="buildAction"> An action that performs configuration of the query type. </param>
-        /// <returns>
-        ///     The same <see cref="ModelBuilder" /> instance so that additional configuration calls can be chained.
-        /// </returns>
-        public virtual ModelBuilder Query([NotNull] Type type, [NotNull] Action<QueryTypeBuilder> buildAction)
-        {
-            Check.NotNull(type, nameof(type));
-            Check.NotNull(buildAction, nameof(buildAction));
-
-            buildAction(Query(type));
-
-            return this;
-        }
-
-        /// <summary>
         ///     Excludes the given entity type from the model. This method is typically used to remove types from
         ///     the model that were added by convention.
         /// </summary>
@@ -312,19 +254,48 @@ namespace Microsoft.EntityFrameworkCore
         }
 
         /// <summary>
-        ///     Applies configuration that is defined in an <see cref="IQueryTypeConfiguration{TQuery}" /> instance.
+        ///     Applies configuration from all <see cref="IEntityTypeConfiguration{TEntity}" /> />
+        ///     instances that are defined in provided assembly.
         /// </summary>
-        /// <typeparam name="TQuery"> The query type to be configured. </typeparam>
-        /// <param name="configuration"> The configuration to be applied. </param>
+        /// <param name="assembly"> The assembly to scan. </param>
+        /// <param name="predicate"> Optional predicate to filter types within the assembly. </param>
         /// <returns>
         ///     The same <see cref="ModelBuilder" /> instance so that additional configuration calls can be chained.
         /// </returns>
-        public virtual ModelBuilder ApplyConfiguration<TQuery>([NotNull] IQueryTypeConfiguration<TQuery> configuration)
-            where TQuery : class
+        public virtual ModelBuilder ApplyConfigurationsFromAssembly(
+            [NotNull] Assembly assembly, [CanBeNull] Func<Type, bool> predicate = null)
         {
-            Check.NotNull(configuration, nameof(configuration));
+            var applyEntityConfigurationMethod = typeof(ModelBuilder)
+                .GetMethods()
+                .Single(
+                    e => e.Name == nameof(ApplyConfiguration)
+                        && e.ContainsGenericParameters
+                        && e.GetParameters().SingleOrDefault()?.ParameterType.GetGenericTypeDefinition()
+                        == typeof(IEntityTypeConfiguration<>));
 
-            configuration.Configure(Query<TQuery>());
+            foreach (var type in assembly.GetConstructibleTypes())
+            {
+                // Only accept types that contain a parameterless constructor, are not abstract and satisfy a predicate if it was used.
+                if (type.GetConstructor(Type.EmptyTypes) == null
+                    || (!predicate?.Invoke(type) ?? false))
+                {
+                    continue;
+                }
+
+                foreach (var @interface in type.GetInterfaces())
+                {
+                    if (!@interface.IsGenericType)
+                    {
+                        continue;
+                    }
+
+                    if (@interface.GetGenericTypeDefinition() == typeof(IEntityTypeConfiguration<>))
+                    {
+                        var target = applyEntityConfigurationMethod.MakeGenericMethod(@interface.GenericTypeArguments[0]);
+                        target.Invoke(this, new[] { Activator.CreateInstance(type) });
+                    }
+                }
+            }
 
             return this;
         }
@@ -339,7 +310,7 @@ namespace Microsoft.EntityFrameworkCore
         {
             Builder.Owned(typeof(T), ConfigurationSource.Explicit);
 
-            return null;
+            return new OwnedEntityTypeBuilder<T>();
         }
 
         /// <summary>
@@ -353,7 +324,7 @@ namespace Microsoft.EntityFrameworkCore
 
             Builder.Owned(type, ConfigurationSource.Explicit);
 
-            return null;
+            return new OwnedEntityTypeBuilder();
         }
 
         /// <summary>
@@ -366,7 +337,7 @@ namespace Microsoft.EntityFrameworkCore
         /// </returns>
         public virtual ModelBuilder HasChangeTrackingStrategy(ChangeTrackingStrategy changeTrackingStrategy)
         {
-            Builder.Metadata.ChangeTrackingStrategy = changeTrackingStrategy;
+            Builder.Metadata.SetChangeTrackingStrategy(changeTrackingStrategy);
 
             return this;
         }
@@ -378,7 +349,7 @@ namespace Microsoft.EntityFrameworkCore
         ///     <para>
         ///         By default, the backing field, if one is found by convention or has been specified, is used when
         ///         new objects are constructed, typically when entities are queried from the database.
-        ///         Properties are used for all other accesses.  Calling this method will change that behavior
+        ///         Properties are used for all other accesses. Calling this method will change that behavior
         ///         for all properties in the model as described in the <see cref="PropertyAccessMode" /> enum.
         ///     </para>
         /// </summary>
@@ -393,7 +364,15 @@ namespace Microsoft.EntityFrameworkCore
             return this;
         }
 
-        private InternalModelBuilder Builder => this.GetInfrastructure();
+        /// <summary>
+        ///     Forces post-processing on the model such that it is ready for use by the runtime. This post
+        ///     processing happens automatically when using <see cref="DbContext.OnModelCreating" />; this method allows it to be run
+        ///     explicitly in cases where the automatic execution is not possible.
+        /// </summary>
+        /// <returns> The finalized <see cref="IModel" />. </returns>
+        public virtual IModel FinalizeModel() => Builder.Metadata.FinalizeModel();
+
+        private InternalModelBuilder Builder => (InternalModelBuilder)this.GetInfrastructure();
 
         #region Hidden System.Object members
 

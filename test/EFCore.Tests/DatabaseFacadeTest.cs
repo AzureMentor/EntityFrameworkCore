@@ -17,12 +17,12 @@ namespace Microsoft.EntityFrameworkCore
 {
     public class DatabaseFacadeTest
     {
-        [Theory]
+        [ConditionalTheory]
         [InlineData(true)]
         [InlineData(false)]
         public async Task Methods_delegate_to_configured_store_creator(bool async)
         {
-            var creator = new FakeDatabaseCreatorWithCanConnect();
+            var creator = new FakeDatabaseCreator();
 
             var context = InMemoryTestHelpers.Instance.CreateContext(
                 new ServiceCollection().AddSingleton<IDatabaseCreator>(creator));
@@ -51,28 +51,10 @@ namespace Microsoft.EntityFrameworkCore
             }
         }
 
-        [Theory]
-        [InlineData(true)]
-        [InlineData(false)]
-        public async Task CanConnect_methods_throw_if_not_implemented(bool async)
-        {
-            var creator = new FakeDatabaseCreator();
-
-            var context = InMemoryTestHelpers.Instance.CreateContext(
-                new ServiceCollection().AddSingleton<IDatabaseCreator>(creator));
-
-            if (async)
-            {
-                await Assert.ThrowsAsync<NotImplementedException>(() => context.Database.CanConnectAsync());
-            }
-            else
-            {
-                Assert.Throws<NotImplementedException>(() => context.Database.CanConnect());
-            }
-        }
-
         private class FakeDatabaseCreator : IDatabaseCreator
         {
+            public int CanConnectCount;
+            public int CanConnectAsyncCount;
             public int EnsureDeletedCount;
             public int EnsureDeletedAsyncCount;
             public int EnsureCreatedCount;
@@ -102,13 +84,6 @@ namespace Microsoft.EntityFrameworkCore
                 return Task.FromResult(true);
             }
 
-        }
-
-        private class FakeDatabaseCreatorWithCanConnect : FakeDatabaseCreator, IDatabaseCreatorWithCanConnect
-        {
-            public int CanConnectCount;
-            public int CanConnectAsyncCount;
-
             public bool CanConnect()
             {
                 CanConnectCount++;
@@ -122,38 +97,32 @@ namespace Microsoft.EntityFrameworkCore
             }
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Can_get_IServiceProvider()
         {
-            using (var context = InMemoryTestHelpers.Instance.CreateContext())
-            {
-                Assert.Same(
-                    ((IInfrastructure<IServiceProvider>)context).Instance,
-                    ((IInfrastructure<IServiceProvider>)context.Database).Instance);
-            }
+            using var context = InMemoryTestHelpers.Instance.CreateContext();
+            Assert.Same(
+                ((IInfrastructure<IServiceProvider>)context).Instance,
+                ((IInfrastructure<IServiceProvider>)context.Database).Instance);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Can_get_DatabaseCreator()
         {
-            using (var context = InMemoryTestHelpers.Instance.CreateContext())
-            {
-                Assert.Same(
-                    context.GetService<IDatabaseCreator>(),
-                    context.Database.GetService<IDatabaseCreator>());
-            }
+            using var context = InMemoryTestHelpers.Instance.CreateContext();
+            Assert.Same(
+                context.GetService<IDatabaseCreator>(),
+                context.Database.GetService<IDatabaseCreator>());
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Can_get_Model()
         {
-            using (var context = InMemoryTestHelpers.Instance.CreateContext())
-            {
-                Assert.Same(context.GetService<IModel>(), context.Database.GetService<IModel>());
-            }
+            using var context = InMemoryTestHelpers.Instance.CreateContext();
+            Assert.Same(context.GetService<IModel>(), context.Database.GetService<IModel>());
         }
 
-        [Theory]
+        [ConditionalTheory]
         [InlineData(true)]
         [InlineData(false)]
         public async Task Can_begin_transaction(bool async)
@@ -196,17 +165,21 @@ namespace Microsoft.EntityFrameworkCore
             public void EnlistTransaction(Transaction transaction) => throw new NotImplementedException();
 
             public void ResetState() => throw new NotImplementedException();
+            public Task ResetStateAsync(CancellationToken cancellationToken = default) => throw new NotImplementedException();
         }
 
         private class FakeDbContextTransaction : IDbContextTransaction
         {
             public void Dispose() => throw new NotImplementedException();
+            public ValueTask DisposeAsync() => throw new NotImplementedException();
             public Guid TransactionId { get; }
             public void Commit() => throw new NotImplementedException();
             public void Rollback() => throw new NotImplementedException();
+            public Task CommitAsync(CancellationToken cancellationToken = default) => throw new NotImplementedException();
+            public Task RollbackAsync(CancellationToken cancellationToken = default) => throw new NotImplementedException();
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Can_commit_transaction()
         {
             var manager = new FakeDbContextTransactionManager(new FakeDbContextTransaction());
@@ -219,7 +192,7 @@ namespace Microsoft.EntityFrameworkCore
             Assert.Equal(1, manager.CommitCalls);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Can_roll_back_transaction()
         {
             var manager = new FakeDbContextTransactionManager(new FakeDbContextTransaction());
@@ -232,7 +205,7 @@ namespace Microsoft.EntityFrameworkCore
             Assert.Equal(1, manager.RollbackCalls);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Can_get_current_transaction()
         {
             var transaction = new FakeDbContextTransaction();
@@ -244,7 +217,7 @@ namespace Microsoft.EntityFrameworkCore
             Assert.Same(transaction, context.Database.CurrentTransaction);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Cannot_use_DatabaseFacade_after_dispose()
         {
             var context = InMemoryTestHelpers.Instance.CreateContext();

@@ -5,9 +5,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.EntityFrameworkCore.Design;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.EntityFrameworkCore.Metadata.Conventions;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.EntityFrameworkCore.SqlServer.Design.Internal;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,11 +21,12 @@ namespace Microsoft.EntityFrameworkCore.Scaffolding.Internal
             Action<ScaffoldedModel> assertScaffold,
             Action<IModel> assertModel)
         {
-            var modelBuilder = new ModelBuilder(SqlServerConventionSetBuilder.Build());
+            var modelBuilder = SqlServerTestHelpers.Instance.CreateConventionBuilder(skipValidation: true);
+            modelBuilder.Model.RemoveAnnotation(CoreAnnotationNames.ProductVersion);
             buildModel(modelBuilder);
-            modelBuilder.GetInfrastructure().Metadata.Validate();
+            var _ = modelBuilder.Model.GetEntityTypeErrors();
 
-            var model = modelBuilder.Model;
+            var model = modelBuilder.FinalizeModel();
 
             var services = new ServiceCollection()
                 .AddEntityFrameworkDesignTimeServices();
@@ -36,12 +36,12 @@ namespace Microsoft.EntityFrameworkCore.Scaffolding.Internal
                 .BuildServiceProvider()
                 .GetRequiredService<IModelCodeGenerator>();
 
+            options.ModelNamespace ??= "TestNamespace";
+            options.ContextName = "TestDbContext";
+            options.ConnectionString = "Initial Catalog=TestDatabase";
+
             var scaffoldedModel = generator.GenerateModel(
                 model,
-                "TestNamespace",
-                /*contextDir:*/ string.Empty,
-                "TestDbContext",
-                "Initial Catalog=TestDatabase",
                 options);
             assertScaffold(scaffoldedModel);
 
@@ -49,6 +49,7 @@ namespace Microsoft.EntityFrameworkCore.Scaffolding.Internal
             {
                 References =
                 {
+                    BuildReference.ByName("Microsoft.EntityFrameworkCore.Abstractions"),
                     BuildReference.ByName("Microsoft.EntityFrameworkCore"),
                     BuildReference.ByName("Microsoft.EntityFrameworkCore.Relational"),
                     BuildReference.ByName("Microsoft.EntityFrameworkCore.SqlServer")

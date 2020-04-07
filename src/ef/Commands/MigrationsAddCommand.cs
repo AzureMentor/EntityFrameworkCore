@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System.Collections;
@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore.Tools.Properties;
 namespace Microsoft.EntityFrameworkCore.Tools.Commands
 {
     // ReSharper disable once ArrangeTypeModifiers
-    partial class MigrationsAddCommand
+    internal partial class MigrationsAddCommand
     {
         protected override void Validate()
         {
@@ -21,7 +21,8 @@ namespace Microsoft.EntityFrameworkCore.Tools.Commands
 
         protected override int Execute()
         {
-            var files = CreateExecutor().AddMigration(_name.Value, _outputDir.Value(), Context.Value());
+            var files = CreateExecutor().AddMigration(
+                _name.Value, _outputDir.Value(), Context.Value(), _namespace.Value());
 
             if (_json.HasValue())
             {

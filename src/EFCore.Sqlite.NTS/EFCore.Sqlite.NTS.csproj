@@ -5,16 +5,22 @@
     <PackageId>Microsoft.EntityFrameworkCore.Sqlite.NetTopologySuite</PackageId>
     <RootNamespace>Microsoft.EntityFrameworkCore.Sqlite</RootNamespace>
     <Description>NetTopologySuite support for the SQLite database provider for Entity Framework Core.</Description>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFramework>netstandard2.1</TargetFramework>
     <MinClientVersion>3.6</MinClientVersion>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PackageTags>$(PackageTags);SQLite;GIS;NTS;OGC;SpatiaLite</PackageTags>
     <CodeAnalysisRuleSet>..\..\EFCore.ruleset</CodeAnalysisRuleSet>
-    <EnableApiCheck>false</EnableApiCheck>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Include="..\Shared\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="build\**\*">
+      <Pack>True</Pack>
+      <PackagePath>build</PackagePath>
+    </None>
   </ItemGroup>
 
   <ItemGroup>
@@ -23,9 +29,12 @@
 
   <ItemGroup>
     <PackageReference Include="mod_spatialite" Version="$(mod_spatialitePackageVersion)" />
-    <PackageReference Include="NetTopologySuite.Core" Version="$(NetTopologySuiteCorePackageVersion)" />
     <PackageReference Include="NetTopologySuite.IO.SpatiaLite" Version="$(NetTopologySuiteIOSpatiaLitePackageVersion)" />
     <PackageReference Include="StyleCop.Analyzers" Version="$(StyleCopAnalyzersPackageVersion)" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="..\stylecop.json" />
   </ItemGroup>
 
   <ItemGroup>

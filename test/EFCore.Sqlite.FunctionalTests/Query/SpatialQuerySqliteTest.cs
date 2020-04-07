@@ -7,7 +7,6 @@ using Xunit.Abstractions;
 
 namespace Microsoft.EntityFrameworkCore.Query
 {
-#if !Test21
     [SpatialiteRequired]
     public class SpatialQuerySqliteTest : SpatialQueryTestBase<SpatialQuerySqliteFixture>
     {
@@ -18,527 +17,877 @@ namespace Microsoft.EntityFrameworkCore.Query
             //Fixture.TestSqlLoggerFactory.SetTestOutputHelper(testOutputHelper);
         }
 
-        public override async Task Area(bool isAsync)
+        public override async Task SimpleSelect(bool async)
         {
-            await base.Area(isAsync);
+            await base.SimpleSelect(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", Area(""e"".""Polygon"") AS ""Area""
-FROM ""PolygonEntity"" AS ""e""");
+                @"SELECT ""p"".""Id"", ""p"".""Geometry"", ""p"".""Point""
+FROM ""PointEntity"" AS ""p""");
         }
 
-        public override async Task AsBinary(bool isAsync)
+        public override async Task Distance_on_converted_geometry_type(bool async)
         {
-            await base.AsBinary(isAsync);
+            await base.Distance_on_converted_geometry_type(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", AsBinary(""e"".""Point"") AS ""Binary""
-FROM ""PointEntity"" AS ""e""");
+                @"@__point_0='0x0001000000000000000000000000000000000000F03F00000000000000000000...' (Nullable = false) (Size = 60) (DbType = String)
+
+SELECT ""g"".""Id"", Distance(""g"".""Location"", @__point_0) AS ""Distance""
+FROM ""GeoPointEntity"" AS ""g""");
         }
 
-        public override async Task AsText(bool isAsync)
+        public override async Task Distance_on_converted_geometry_type_lhs(bool async)
         {
-            await base.AsText(isAsync);
+            await base.Distance_on_converted_geometry_type_lhs(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", AsText(""e"".""Point"") AS ""Text""
-FROM ""PointEntity"" AS ""e""");
+                @"@__point_0='0x0001000000000000000000000000000000000000F03F00000000000000000000...' (Nullable = false) (Size = 60) (DbType = String)
+
+SELECT ""g"".""Id"", Distance(@__point_0, ""g"".""Location"") AS ""Distance""
+FROM ""GeoPointEntity"" AS ""g""");
         }
 
-        public override async Task Boundary(bool isAsync)
+        public override async Task Distance_on_converted_geometry_type_constant(bool async)
         {
-            await base.Boundary(isAsync);
+            await base.Distance_on_converted_geometry_type_constant(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", Boundary(""e"".""Polygon"") AS ""Boundary""
-FROM ""PolygonEntity"" AS ""e""");
+                @"SELECT ""g"".""Id"", Distance(""g"".""Location"", GeomFromText('POINT (0 1)')) AS ""Distance""
+FROM ""GeoPointEntity"" AS ""g""");
         }
 
-        public override async Task Buffer(bool isAsync)
+        public override async Task Distance_on_converted_geometry_type_constant_lhs(bool async)
         {
-            await base.Buffer(isAsync);
+            await base.Distance_on_converted_geometry_type_constant_lhs(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", Buffer(""e"".""Polygon"", 1.0) AS ""Buffer""
-FROM ""PolygonEntity"" AS ""e""");
+                @"SELECT ""g"".""Id"", Distance(GeomFromText('POINT (0 1)'), ""g"".""Location"") AS ""Distance""
+FROM ""GeoPointEntity"" AS ""g""");
         }
 
-        public override async Task Buffer_quadrantSegments(bool isAsync)
+        public override async Task WithConversion(bool async)
         {
-            await base.Buffer_quadrantSegments(isAsync);
+            await base.WithConversion(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", Buffer(""e"".""Polygon"", 1.0, 8) AS ""Buffer""
-FROM ""PolygonEntity"" AS ""e""");
+                @"SELECT ""g"".""Id"", ""g"".""Location""
+FROM ""GeoPointEntity"" AS ""g""");
         }
 
-        public override async Task Centroid(bool isAsync)
+        public override async Task Area(bool async)
         {
-            await base.Centroid(isAsync);
+            await base.Area(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", Centroid(""e"".""Polygon"") AS ""Centroid""
-FROM ""PolygonEntity"" AS ""e""");
+                @"SELECT ""p"".""Id"", Area(""p"".""Polygon"") AS ""Area""
+FROM ""PolygonEntity"" AS ""p""");
         }
 
-        public override async Task Contains(bool isAsync)
+        public override async Task AsBinary(bool async)
         {
-            await base.Contains(isAsync);
+            await base.AsBinary(async);
+
+            AssertSql(
+                @"SELECT ""p"".""Id"", AsBinary(""p"".""Point"") AS ""Binary""
+FROM ""PointEntity"" AS ""p""");
+        }
+
+        public override async Task AsBinary_with_null_check(bool async)
+        {
+            await base.AsBinary_with_null_check(async);
+
+            AssertSql(
+                @"SELECT ""p"".""Id"", CASE
+    WHEN ""p"".""Point"" IS NULL THEN NULL
+    ELSE AsBinary(""p"".""Point"")
+END AS ""Binary""
+FROM ""PointEntity"" AS ""p""");
+        }
+
+        public override async Task AsText(bool async)
+        {
+            await base.AsText(async);
+
+            AssertSql(
+                @"SELECT ""p"".""Id"", AsText(""p"".""Point"") AS ""Text""
+FROM ""PointEntity"" AS ""p""");
+        }
+
+        public override async Task Boundary(bool async)
+        {
+            await base.Boundary(async);
+
+            AssertSql(
+                @"SELECT ""p"".""Id"", Boundary(""p"".""Polygon"") AS ""Boundary""
+FROM ""PolygonEntity"" AS ""p""");
+        }
+
+        public override async Task Buffer(bool async)
+        {
+            await base.Buffer(async);
+
+            AssertSql(
+                @"SELECT ""p"".""Id"", Buffer(""p"".""Polygon"", 1.0) AS ""Buffer""
+FROM ""PolygonEntity"" AS ""p""");
+        }
+
+        public override async Task Buffer_quadrantSegments(bool async)
+        {
+            await base.Buffer_quadrantSegments(async);
+
+            AssertSql(
+                @"SELECT ""p"".""Id"", Buffer(""p"".""Polygon"", 1.0, 8) AS ""Buffer""
+FROM ""PolygonEntity"" AS ""p""");
+        }
+
+        public override async Task Centroid(bool async)
+        {
+            await base.Centroid(async);
+
+            AssertSql(
+                @"SELECT ""p"".""Id"", Centroid(""p"".""Polygon"") AS ""Centroid""
+FROM ""PolygonEntity"" AS ""p""");
+        }
+
+        public override async Task Contains(bool async)
+        {
+            await base.Contains(async);
 
             AssertSql(
                 @"@__point_0='0x000100000000000000000000D03F000000000000D03F000000000000D03F0000...' (Size = 60) (DbType = String)
 
-SELECT ""e"".""Id"", Contains(""e"".""Polygon"", @__point_0) AS ""Contains""
-FROM ""PolygonEntity"" AS ""e""");
+SELECT ""p"".""Id"", CASE
+    WHEN ""p"".""Polygon"" IS NOT NULL THEN Contains(""p"".""Polygon"", @__point_0)
+END AS ""Contains""
+FROM ""PolygonEntity"" AS ""p""");
         }
 
-        public override async Task ConvexHull(bool isAsync)
+        public override async Task ConvexHull(bool async)
         {
-            await base.ConvexHull(isAsync);
+            await base.ConvexHull(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", ConvexHull(""e"".""Polygon"") AS ""ConvexHull""
-FROM ""PolygonEntity"" AS ""e""");
+                @"SELECT ""p"".""Id"", ConvexHull(""p"".""Polygon"") AS ""ConvexHull""
+FROM ""PolygonEntity"" AS ""p""");
         }
 
-        public override async Task IGeometryCollection_Count(bool isAsync)
+        public override async Task IGeometryCollection_Count(bool async)
         {
-            await base.IGeometryCollection_Count(isAsync);
+            await base.IGeometryCollection_Count(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", NumGeometries(""e"".""MultiLineString"") AS ""Count""
-FROM ""MultiLineStringEntity"" AS ""e""");
+                @"SELECT ""m"".""Id"", NumGeometries(""m"".""MultiLineString"") AS ""Count""
+FROM ""MultiLineStringEntity"" AS ""m""");
         }
 
-        public override async Task LineString_Count(bool isAsync)
+        public override async Task LineString_Count(bool async)
         {
-            await base.LineString_Count(isAsync);
+            await base.LineString_Count(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", NumPoints(""e"".""LineString"") AS ""Count""
-FROM ""LineStringEntity"" AS ""e""");
+                @"SELECT ""l"".""Id"", NumPoints(""l"".""LineString"") AS ""Count""
+FROM ""LineStringEntity"" AS ""l""");
         }
 
-        public override async Task CoveredBy(bool isAsync)
+        public override async Task CoveredBy(bool async)
         {
-            await base.CoveredBy(isAsync);
+            await base.CoveredBy(async);
 
             AssertSql(
                 @"@__polygon_0='0x000100000000000000000000F0BF000000000000F0BF00000000000000400000...' (Size = 132) (DbType = String)
 
-SELECT ""e"".""Id"", CoveredBy(""e"".""Point"", @__polygon_0) AS ""CoveredBy""
-FROM ""PointEntity"" AS ""e""");
+SELECT ""p"".""Id"", CASE
+    WHEN ""p"".""Point"" IS NOT NULL THEN CoveredBy(""p"".""Point"", @__polygon_0)
+END AS ""CoveredBy""
+FROM ""PointEntity"" AS ""p""");
         }
 
-        public override async Task Covers(bool isAsync)
+        public override async Task Covers(bool async)
         {
-            await base.Covers(isAsync);
+            await base.Covers(async);
 
             AssertSql(
                 @"@__point_0='0x000100000000000000000000D03F000000000000D03F000000000000D03F0000...' (Size = 60) (DbType = String)
 
-SELECT ""e"".""Id"", Covers(""e"".""Polygon"", @__point_0) AS ""Covers""
-FROM ""PolygonEntity"" AS ""e""");
+SELECT ""p"".""Id"", CASE
+    WHEN ""p"".""Polygon"" IS NOT NULL THEN Covers(""p"".""Polygon"", @__point_0)
+END AS ""Covers""
+FROM ""PolygonEntity"" AS ""p""");
         }
 
-        public override async Task Crosses(bool isAsync)
+        public override async Task Crosses(bool async)
         {
-            await base.Crosses(isAsync);
+            await base.Crosses(async);
 
             AssertSql(
                 @"@__lineString_0='0x000100000000000000000000E03F000000000000E0BF000000000000E03F0000...' (Size = 80) (DbType = String)
 
-SELECT ""e"".""Id"", Crosses(""e"".""LineString"", @__lineString_0) AS ""Crosses""
-FROM ""LineStringEntity"" AS ""e""");
+SELECT ""l"".""Id"", CASE
+    WHEN ""l"".""LineString"" IS NOT NULL THEN Crosses(""l"".""LineString"", @__lineString_0)
+END AS ""Crosses""
+FROM ""LineStringEntity"" AS ""l""");
         }
 
-        public override async Task Difference(bool isAsync)
+        public override async Task Difference(bool async)
         {
-            await base.Difference(isAsync);
+            await base.Difference(async);
 
             AssertSql(
                 @"@__polygon_0='0x00010000000000000000000000000000000000000000000000000000F03F0000...' (Size = 116) (DbType = String)
 
-SELECT ""e"".""Id"", Difference(""e"".""Polygon"", @__polygon_0) AS ""Difference""
-FROM ""PolygonEntity"" AS ""e""");
+SELECT ""p"".""Id"", Difference(""p"".""Polygon"", @__polygon_0) AS ""Difference""
+FROM ""PolygonEntity"" AS ""p""");
         }
 
-        public override async Task Dimension(bool isAsync)
+        public override async Task Dimension(bool async)
         {
-            await base.Dimension(isAsync);
+            await base.Dimension(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", Dimension(""e"".""Point"") AS ""Dimension""
-FROM ""PointEntity"" AS ""e""");
+                @"SELECT ""p"".""Id"", Dimension(""p"".""Point"") AS ""Dimension""
+FROM ""PointEntity"" AS ""p""");
         }
 
-        public override async Task Disjoint(bool isAsync)
+        public override async Task Disjoint_with_cast_to_nullable(bool async)
         {
-            await base.Disjoint(isAsync);
+            await base.Disjoint_with_cast_to_nullable(async);
 
             AssertSql(
                 @"@__point_0='0x000100000000000000000000F03F000000000000F03F000000000000F03F0000...' (Size = 60) (DbType = String)
 
-SELECT ""e"".""Id"", Disjoint(""e"".""Polygon"", @__point_0) AS ""Disjoint""
-FROM ""PolygonEntity"" AS ""e""");
+SELECT ""p"".""Id"", CASE
+    WHEN ""p"".""Polygon"" IS NOT NULL THEN Disjoint(""p"".""Polygon"", @__point_0)
+END AS ""Disjoint""
+FROM ""PolygonEntity"" AS ""p""");
         }
 
-        public override async Task Distance(bool isAsync)
+        public override async Task Disjoint_without_cast_to_nullable(bool async)
         {
-            await base.Distance(isAsync);
+            await base.Disjoint_without_cast_to_nullable(async);
+
+            AssertSql(
+                @"@__point_0='0x000100000000000000000000F03F000000000000F03F000000000000F03F0000...' (Size = 60) (DbType = String)
+
+SELECT ""p"".""Id"", CASE
+    WHEN ""p"".""Polygon"" IS NOT NULL THEN Disjoint(""p"".""Polygon"", @__point_0)
+END AS ""Disjoint""
+FROM ""PolygonEntity"" AS ""p""");
+        }
+
+        public override async Task Disjoint_with_null_check(bool async)
+        {
+            await base.Disjoint_with_null_check(async);
+
+            AssertSql(
+                @"@__point_0='0x000100000000000000000000F03F000000000000F03F000000000000F03F0000...' (Size = 60) (DbType = String)
+
+SELECT ""p"".""Id"", CASE
+    WHEN ""p"".""Polygon"" IS NULL THEN NULL
+    WHEN ""p"".""Polygon"" IS NOT NULL THEN Disjoint(""p"".""Polygon"", @__point_0)
+END AS ""Disjoint""
+FROM ""PolygonEntity"" AS ""p""");
+        }
+
+        public override async Task Distance_without_null_check(bool async)
+        {
+            await base.Distance_without_null_check(async);
 
             AssertSql(
                 @"@__point_0='0x0001000000000000000000000000000000000000F03F00000000000000000000...' (Size = 60) (DbType = String)
 
-SELECT ""e"".""Id"", Distance(""e"".""Point"", @__point_0) AS ""Distance""
-FROM ""PointEntity"" AS ""e""");
+SELECT ""p"".""Id"", Distance(""p"".""Point"", @__point_0) AS ""Distance""
+FROM ""PointEntity"" AS ""p""");
         }
 
-        public override async Task EndPoint(bool isAsync)
+        public override async Task Distance_with_null_check(bool async)
         {
-            await base.EndPoint(isAsync);
+            await base.Distance_with_null_check(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", EndPoint(""e"".""LineString"") AS ""EndPoint""
-FROM ""LineStringEntity"" AS ""e""");
+                @"@__point_0='0x0001000000000000000000000000000000000000F03F00000000000000000000...' (Size = 60) (DbType = String)
+
+SELECT ""p"".""Id"", Distance(""p"".""Point"", @__point_0) AS ""Distance""
+FROM ""PointEntity"" AS ""p""");
         }
 
-        public override async Task Envelope(bool isAsync)
+        public override async Task Distance_with_cast_to_nullable(bool async)
         {
-            await base.Envelope(isAsync);
+            await base.Distance_with_cast_to_nullable(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", Envelope(""e"".""Polygon"") AS ""Envelope""
-FROM ""PolygonEntity"" AS ""e""");
+                @"@__point_0='0x0001000000000000000000000000000000000000F03F00000000000000000000...' (Size = 60) (DbType = String)
+
+SELECT ""p"".""Id"", Distance(""p"".""Point"", @__point_0) AS ""Distance""
+FROM ""PointEntity"" AS ""p""");
         }
 
-        public override async Task EqualsTopologically(bool isAsync)
+        public override async Task Distance_geometry(bool async)
         {
-            await base.EqualsTopologically(isAsync);
+            await base.Distance_geometry(async);
+
+            AssertSql(
+                @"@__point_0='0x0001000000000000000000000000000000000000F03F00000000000000000000...' (Size = 60) (DbType = String)
+
+SELECT ""p"".""Id"", Distance(""p"".""Geometry"", @__point_0) AS ""Distance""
+FROM ""PointEntity"" AS ""p""");
+        }
+
+        public override async Task Distance_constant(bool async)
+        {
+            await base.Distance_constant(async);
+
+            AssertSql(
+                @"SELECT ""p"".""Id"", Distance(""p"".""Point"", GeomFromText('POINT (0 1)')) AS ""Distance""
+FROM ""PointEntity"" AS ""p""");
+        }
+
+        public override async Task Distance_constant_srid_4326(bool async)
+        {
+            await base.Distance_constant_srid_4326(async);
+
+            AssertSql(
+                @"SELECT ""p"".""Id"", Distance(""p"".""Point"", GeomFromText('POINT (1 1)', 4326)) AS ""Distance""
+FROM ""PointEntity"" AS ""p""");
+        }
+
+        public override async Task Distance_constant_lhs(bool async)
+        {
+            await base.Distance_constant_lhs(async);
+
+            AssertSql(
+                @"SELECT ""p"".""Id"", Distance(GeomFromText('POINT (0 1)'), ""p"".""Point"") AS ""Distance""
+FROM ""PointEntity"" AS ""p""");
+        }
+
+        public override async Task EndPoint(bool async)
+        {
+            await base.EndPoint(async);
+
+            AssertSql(
+                @"SELECT ""l"".""Id"", EndPoint(""l"".""LineString"") AS ""EndPoint""
+FROM ""LineStringEntity"" AS ""l""");
+        }
+
+        public override async Task Envelope(bool async)
+        {
+            await base.Envelope(async);
+
+            AssertSql(
+                @"SELECT ""p"".""Id"", Envelope(""p"".""Polygon"") AS ""Envelope""
+FROM ""PolygonEntity"" AS ""p""");
+        }
+
+        public override async Task EqualsTopologically(bool async)
+        {
+            await base.EqualsTopologically(async);
 
             AssertSql(
                 @"@__point_0='0x0001000000000000000000000000000000000000000000000000000000000000...' (Size = 60) (DbType = String)
 
-SELECT ""e"".""Id"", Equals(""e"".""Point"", @__point_0) AS ""EqualsTopologically""
-FROM ""PointEntity"" AS ""e""");
+SELECT ""p"".""Id"", CASE
+    WHEN ""p"".""Point"" IS NOT NULL THEN Equals(""p"".""Point"", @__point_0)
+END AS ""EqualsTopologically""
+FROM ""PointEntity"" AS ""p""");
         }
 
-        public override async Task ExteriorRing(bool isAsync)
+        public override async Task ExteriorRing(bool async)
         {
-            await base.ExteriorRing(isAsync);
+            await base.ExteriorRing(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", ExteriorRing(""e"".""Polygon"") AS ""ExteriorRing""
-FROM ""PolygonEntity"" AS ""e""");
+                @"SELECT ""p"".""Id"", ExteriorRing(""p"".""Polygon"") AS ""ExteriorRing""
+FROM ""PolygonEntity"" AS ""p""");
         }
 
-        public override async Task GetGeometryN(bool isAsync)
+        public override async Task GeometryType(bool async)
         {
-            await base.GetGeometryN(isAsync);
+            await base.GeometryType(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", GeometryN(""e"".""MultiLineString"", 0 + 1) AS ""Geometry0""
-FROM ""MultiLineStringEntity"" AS ""e""");
+                @"SELECT ""p"".""Id"", CASE rtrim(GeometryType(""p"".""Point""), ' ZM')
+    WHEN 'POINT' THEN 'Point'
+    WHEN 'LINESTRING' THEN 'LineString'
+    WHEN 'POLYGON' THEN 'Polygon'
+    WHEN 'MULTIPOINT' THEN 'MultiPoint'
+    WHEN 'MULTILINESTRING' THEN 'MultiLineString'
+    WHEN 'MULTIPOLYGON' THEN 'MultiPolygon'
+    WHEN 'GEOMETRYCOLLECTION' THEN 'GeometryCollection'
+END AS ""GeometryType""
+FROM ""PointEntity"" AS ""p""");
         }
 
-        public override async Task GetInteriorRingN(bool isAsync)
+        public override async Task GetGeometryN(bool async)
         {
-            await base.GetInteriorRingN(isAsync);
+            await base.GetGeometryN(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", InteriorRingN(""e"".""Polygon"", 0 + 1) AS ""InteriorRing0""
-FROM ""PolygonEntity"" AS ""e""
-WHERE NumInteriorRing(""e"".""Polygon"") > 0");
+                @"SELECT ""m"".""Id"", GeometryN(""m"".""MultiLineString"", 0 + 1) AS ""Geometry0""
+FROM ""MultiLineStringEntity"" AS ""m""");
         }
 
-        public override async Task GetPointN(bool isAsync)
+        public override async Task GetGeometryN_with_null_argument(bool async)
         {
-            await base.GetPointN(isAsync);
+            await base.GetGeometryN_with_null_argument(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", PointN(""e"".""LineString"", 0 + 1) AS ""Point0""
-FROM ""LineStringEntity"" AS ""e""");
+                @"SELECT ""m0"".""Id"", GeometryN(""m0"".""MultiLineString"", (
+    SELECT MAX(""m"".""Id"")
+    FROM ""MultiLineStringEntity"" AS ""m""
+    WHERE 0) + 1) AS ""Geometry0""
+FROM ""MultiLineStringEntity"" AS ""m0""");
         }
 
-        public override async Task Intersection(bool isAsync)
+        public override async Task GetInteriorRingN(bool async)
         {
-            await base.Intersection(isAsync);
+            await base.GetInteriorRingN(async);
+
+            AssertSql(
+                @"SELECT ""p"".""Id"", CASE
+    WHEN NumInteriorRing(""p"".""Polygon"") = 0 THEN NULL
+    ELSE InteriorRingN(""p"".""Polygon"", 0 + 1)
+END AS ""InteriorRing0""
+FROM ""PolygonEntity"" AS ""p""");
+        }
+
+        public override async Task GetPointN(bool async)
+        {
+            await base.GetPointN(async);
+
+            AssertSql(
+                @"SELECT ""l"".""Id"", PointN(""l"".""LineString"", 0 + 1) AS ""Point0""
+FROM ""LineStringEntity"" AS ""l""");
+        }
+
+        public override async Task InteriorPoint(bool async)
+        {
+            await base.InteriorPoint(async);
+
+            AssertSql(
+                @"SELECT ""p"".""Id"", PointOnSurface(""p"".""Polygon"") AS ""InteriorPoint"", ""p"".""Polygon""
+FROM ""PolygonEntity"" AS ""p""");
+        }
+
+        public override async Task Intersection(bool async)
+        {
+            await base.Intersection(async);
 
             AssertSql(
                 @"@__polygon_0='0x00010000000000000000000000000000000000000000000000000000F03F0000...' (Size = 116) (DbType = String)
 
-SELECT ""e"".""Id"", Intersection(""e"".""Polygon"", @__polygon_0) AS ""Intersection""
-FROM ""PolygonEntity"" AS ""e""");
+SELECT ""p"".""Id"", Intersection(""p"".""Polygon"", @__polygon_0) AS ""Intersection""
+FROM ""PolygonEntity"" AS ""p""");
         }
 
-        public override async Task Intersects(bool isAsync)
+        public override async Task Intersects(bool async)
         {
-            await base.Intersects(isAsync);
+            await base.Intersects(async);
 
             AssertSql(
                 @"@__lineString_0='0x000100000000000000000000E03F000000000000E0BF000000000000E03F0000...' (Size = 80) (DbType = String)
 
-SELECT ""e"".""Id"", Intersects(""e"".""LineString"", @__lineString_0) AS ""Intersects""
-FROM ""LineStringEntity"" AS ""e""");
+SELECT ""l"".""Id"", CASE
+    WHEN ""l"".""LineString"" IS NOT NULL THEN Intersects(""l"".""LineString"", @__lineString_0)
+END AS ""Intersects""
+FROM ""LineStringEntity"" AS ""l""");
         }
 
-        public override async Task ICurve_IsClosed(bool isAsync)
+        public override async Task ICurve_IsClosed(bool async)
         {
-            await base.ICurve_IsClosed(isAsync);
+            await base.ICurve_IsClosed(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", IsClosed(""e"".""LineString"") AS ""IsClosed""
-FROM ""LineStringEntity"" AS ""e""");
+                @"SELECT ""l"".""Id"", CASE
+    WHEN ""l"".""LineString"" IS NOT NULL THEN IsClosed(""l"".""LineString"")
+END AS ""IsClosed""
+FROM ""LineStringEntity"" AS ""l""");
         }
 
-        public override async Task IMultiCurve_IsClosed(bool isAsync)
+        public override async Task IMultiCurve_IsClosed(bool async)
         {
-            await base.IMultiCurve_IsClosed(isAsync);
+            await base.IMultiCurve_IsClosed(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", IsClosed(""e"".""MultiLineString"") AS ""IsClosed""
-FROM ""MultiLineStringEntity"" AS ""e""");
+                @"SELECT ""m"".""Id"", CASE
+    WHEN ""m"".""MultiLineString"" IS NOT NULL THEN IsClosed(""m"".""MultiLineString"")
+END AS ""IsClosed""
+FROM ""MultiLineStringEntity"" AS ""m""");
         }
 
-        public override async Task IsEmpty(bool isAsync)
+        public override async Task IsEmpty(bool async)
         {
-            await base.IsEmpty(isAsync);
+            await base.IsEmpty(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", IsEmpty(""e"".""MultiLineString"") AS ""IsEmpty""
-FROM ""MultiLineStringEntity"" AS ""e""");
+                @"SELECT ""m"".""Id"", CASE
+    WHEN ""m"".""MultiLineString"" IS NOT NULL THEN IsEmpty(""m"".""MultiLineString"")
+END AS ""IsEmpty""
+FROM ""MultiLineStringEntity"" AS ""m""");
         }
 
-        public override async Task IsRing(bool isAsync)
+        public override async Task IsRing(bool async)
         {
-            await base.IsRing(isAsync);
+            await base.IsRing(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", IsRing(""e"".""LineString"") AS ""IsRing""
-FROM ""LineStringEntity"" AS ""e""");
+                @"SELECT ""l"".""Id"", CASE
+    WHEN ""l"".""LineString"" IS NOT NULL THEN IsRing(""l"".""LineString"")
+END AS ""IsRing""
+FROM ""LineStringEntity"" AS ""l""");
         }
 
-        public override async Task IsSimple(bool isAsync)
+        public override async Task IsSimple(bool async)
         {
-            await base.IsSimple(isAsync);
+            await base.IsSimple(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", IsSimple(""e"".""LineString"") AS ""IsSimple""
-FROM ""LineStringEntity"" AS ""e""");
+                @"SELECT ""l"".""Id"", CASE
+    WHEN ""l"".""LineString"" IS NOT NULL THEN IsSimple(""l"".""LineString"")
+END AS ""IsSimple""
+FROM ""LineStringEntity"" AS ""l""");
         }
 
-        public override async Task IsValid(bool isAsync)
+        public override async Task IsValid(bool async)
         {
-            await base.IsValid(isAsync);
+            await base.IsValid(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", IsValid(""e"".""Point"") AS ""IsValid""
-FROM ""PointEntity"" AS ""e""");
+                @"SELECT ""p"".""Id"", CASE
+    WHEN ""p"".""Point"" IS NOT NULL THEN IsValid(""p"".""Point"")
+END AS ""IsValid""
+FROM ""PointEntity"" AS ""p""");
         }
 
-        public override async Task Item(bool isAsync)
+        public override async Task IsWithinDistance(bool async)
         {
-            await base.Item(isAsync);
+            await base.IsWithinDistance(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", GeometryN(""e"".""MultiLineString"", 0 + 1) AS ""Item0""
-FROM ""MultiLineStringEntity"" AS ""e""");
+                @"@__point_0='0x0001000000000000000000000000000000000000F03F00000000000000000000...' (Size = 60) (DbType = String)
+
+SELECT ""p"".""Id"", Distance(""p"".""Point"", @__point_0) <= 1.0 AS ""IsWithinDistance""
+FROM ""PointEntity"" AS ""p""");
         }
 
-        public override async Task Length(bool isAsync)
+        public override async Task Item(bool async)
         {
-            await base.Length(isAsync);
+            await base.Item(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", GLength(""e"".""LineString"") AS ""Length""
-FROM ""LineStringEntity"" AS ""e""");
+                @"SELECT ""m"".""Id"", GeometryN(""m"".""MultiLineString"", 0 + 1) AS ""Item0""
+FROM ""MultiLineStringEntity"" AS ""m""");
         }
 
-        public override async Task M(bool isAsync)
+        public override async Task Length(bool async)
         {
-            await base.M(isAsync);
+            await base.Length(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", M(""e"".""Point"") AS ""M""
-FROM ""PointEntity"" AS ""e""");
+                @"SELECT ""l"".""Id"", GLength(""l"".""LineString"") AS ""Length""
+FROM ""LineStringEntity"" AS ""l""");
         }
 
-        public override async Task NumGeometries(bool isAsync)
+        public override async Task M(bool async)
         {
-            await base.NumGeometries(isAsync);
+            await base.M(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", NumGeometries(""e"".""MultiLineString"") AS ""NumGeometries""
-FROM ""MultiLineStringEntity"" AS ""e""");
+                @"SELECT ""p"".""Id"", M(""p"".""Point"") AS ""M""
+FROM ""PointEntity"" AS ""p""");
         }
 
-        public override async Task NumInteriorRings(bool isAsync)
+        // No Sqlite Translation
+        public override Task Normalized(bool async)
         {
-            await base.NumInteriorRings(isAsync);
+            return Task.CompletedTask;
+        }
+
+        public override async Task NumGeometries(bool async)
+        {
+            await base.NumGeometries(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", NumInteriorRing(""e"".""Polygon"") AS ""NumInteriorRings""
-FROM ""PolygonEntity"" AS ""e""");
+                @"SELECT ""m"".""Id"", NumGeometries(""m"".""MultiLineString"") AS ""NumGeometries""
+FROM ""MultiLineStringEntity"" AS ""m""");
         }
 
-        public override async Task NumPoints(bool isAsync)
+        public override async Task NumInteriorRings(bool async)
         {
-            await base.NumPoints(isAsync);
+            await base.NumInteriorRings(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", NumPoints(""e"".""LineString"") AS ""NumPoints""
-FROM ""LineStringEntity"" AS ""e""");
+                @"SELECT ""p"".""Id"", NumInteriorRing(""p"".""Polygon"") AS ""NumInteriorRings""
+FROM ""PolygonEntity"" AS ""p""");
         }
 
-        public override async Task Overlaps(bool isAsync)
+        public override async Task NumPoints(bool async)
         {
-            await base.Overlaps(isAsync);
+            await base.NumPoints(async);
 
             AssertSql(
-                @"@__polygon_0='0x00010000000000000000000000000000000000000000000000000000F03F0000...' (Size = 116) (DbType = String)
-
-SELECT ""e"".""Id"", Overlaps(""e"".""Polygon"", @__polygon_0) AS ""Overlaps""
-FROM ""PolygonEntity"" AS ""e""");
+                @"SELECT ""l"".""Id"", NumPoints(""l"".""LineString"") AS ""NumPoints""
+FROM ""LineStringEntity"" AS ""l""");
         }
 
-        public override async Task PointOnSurface(bool isAsync)
+        public override async Task OgcGeometryType(bool async)
         {
-            await base.PointOnSurface(isAsync);
+            await base.OgcGeometryType(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", PointOnSurface(""e"".""Polygon"") AS ""PointOnSurface"", ""e"".""Polygon""
-FROM ""PolygonEntity"" AS ""e""");
+                @"SELECT ""p"".""Id"", CASE rtrim(GeometryType(""p"".""Point""), ' ZM')
+    WHEN 'POINT' THEN 1
+    WHEN 'LINESTRING' THEN 2
+    WHEN 'POLYGON' THEN 3
+    WHEN 'MULTIPOINT' THEN 4
+    WHEN 'MULTILINESTRING' THEN 5
+    WHEN 'MULTIPOLYGON' THEN 6
+    WHEN 'GEOMETRYCOLLECTION' THEN 7
+END AS ""OgcGeometryType""
+FROM ""PointEntity"" AS ""p""");
         }
 
-        public override async Task Relate(bool isAsync)
+        public override async Task Overlaps(bool async)
         {
-            await base.Relate(isAsync);
-
-            AssertSql(
-                @"@__polygon_0='0x00010000000000000000000000000000000000000000000000000000F03F0000...' (Size = 116) (DbType = String)
-
-SELECT ""e"".""Id"", Relate(""e"".""Polygon"", @__polygon_0, '212111212') AS ""Relate""
-FROM ""PolygonEntity"" AS ""e""");
-        }
-
-        public override async Task Reverse(bool isAsync)
-        {
-            await base.Reverse(isAsync);
-
-            AssertSql(
-                @"SELECT ""e"".""Id"", ST_Reverse(""e"".""LineString"") AS ""Reverse""
-FROM ""LineStringEntity"" AS ""e""");
-        }
-
-        public override async Task SRID(bool isAsync)
-        {
-            await base.SRID(isAsync);
-
-            AssertSql(
-                @"SELECT ""e"".""Id"", SRID(""e"".""Point"") AS ""SRID""
-FROM ""PointEntity"" AS ""e""");
-        }
-
-        public override async Task StartPoint(bool isAsync)
-        {
-            await base.StartPoint(isAsync);
-
-            AssertSql(
-                @"SELECT ""e"".""Id"", StartPoint(""e"".""LineString"") AS ""StartPoint""
-FROM ""LineStringEntity"" AS ""e""");
-        }
-
-        public override async Task SymmetricDifference(bool isAsync)
-        {
-            await base.SymmetricDifference(isAsync);
+            await base.Overlaps(async);
 
             AssertSql(
                 @"@__polygon_0='0x00010000000000000000000000000000000000000000000000000000F03F0000...' (Size = 116) (DbType = String)
 
-SELECT ""e"".""Id"", SymDifference(""e"".""Polygon"", @__polygon_0) AS ""SymmetricDifference""
-FROM ""PolygonEntity"" AS ""e""");
+SELECT ""p"".""Id"", CASE
+    WHEN ""p"".""Polygon"" IS NOT NULL THEN Overlaps(""p"".""Polygon"", @__polygon_0)
+END AS ""Overlaps""
+FROM ""PolygonEntity"" AS ""p""");
         }
 
-        public override async Task ToBinary(bool isAsync)
+        public override async Task PointOnSurface(bool async)
         {
-            await base.ToBinary(isAsync);
+            await base.PointOnSurface(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", AsBinary(""e"".""Point"") AS ""Binary""
-FROM ""PointEntity"" AS ""e""");
+                @"SELECT ""p"".""Id"", PointOnSurface(""p"".""Polygon"") AS ""PointOnSurface"", ""p"".""Polygon""
+FROM ""PolygonEntity"" AS ""p""");
         }
 
-        public override async Task ToText(bool isAsync)
+        public override async Task Relate(bool async)
         {
-            await base.ToText(isAsync);
-
-            AssertSql(
-                @"SELECT ""e"".""Id"", AsText(""e"".""Point"") AS ""Text""
-FROM ""PointEntity"" AS ""e""");
-        }
-
-        public override async Task Touches(bool isAsync)
-        {
-            await base.Touches(isAsync);
+            await base.Relate(async);
 
             AssertSql(
                 @"@__polygon_0='0x00010000000000000000000000000000000000000000000000000000F03F0000...' (Size = 116) (DbType = String)
 
-SELECT ""e"".""Id"", Touches(""e"".""Polygon"", @__polygon_0) AS ""Touches""
-FROM ""PolygonEntity"" AS ""e""");
+SELECT ""p"".""Id"", CASE
+    WHEN ""p"".""Polygon"" IS NOT NULL THEN Relate(""p"".""Polygon"", @__polygon_0, '212111212')
+END AS ""Relate""
+FROM ""PolygonEntity"" AS ""p""");
         }
 
-        public override async Task Union(bool isAsync)
+        public override async Task Reverse(bool async)
         {
-            await base.Union(isAsync);
+            await base.Reverse(async);
+
+            AssertSql(
+                @"SELECT ""l"".""Id"", ST_Reverse(""l"".""LineString"") AS ""Reverse""
+FROM ""LineStringEntity"" AS ""l""");
+        }
+
+        public override async Task SRID(bool async)
+        {
+            await base.SRID(async);
+
+            AssertSql(
+                @"SELECT ""p"".""Id"", SRID(""p"".""Point"") AS ""SRID""
+FROM ""PointEntity"" AS ""p""");
+        }
+
+        public override async Task SRID_geometry(bool async)
+        {
+            await base.SRID_geometry(async);
+
+            AssertSql(
+                @"SELECT ""p"".""Id"", SRID(""p"".""Geometry"") AS ""SRID""
+FROM ""PointEntity"" AS ""p""");
+        }
+
+        public override async Task StartPoint(bool async)
+        {
+            await base.StartPoint(async);
+
+            AssertSql(
+                @"SELECT ""l"".""Id"", StartPoint(""l"".""LineString"") AS ""StartPoint""
+FROM ""LineStringEntity"" AS ""l""");
+        }
+
+        public override async Task SymmetricDifference(bool async)
+        {
+            await base.SymmetricDifference(async);
 
             AssertSql(
                 @"@__polygon_0='0x00010000000000000000000000000000000000000000000000000000F03F0000...' (Size = 116) (DbType = String)
 
-SELECT ""e"".""Id"", GUnion(""e"".""Polygon"", @__polygon_0) AS ""Union""
-FROM ""PolygonEntity"" AS ""e""");
+SELECT ""p"".""Id"", SymDifference(""p"".""Polygon"", @__polygon_0) AS ""SymmetricDifference""
+FROM ""PolygonEntity"" AS ""p""");
         }
 
-        public override async Task Within(bool isAsync)
+        public override async Task ToBinary(bool async)
         {
-            await base.Within(isAsync);
+            await base.ToBinary(async);
+
+            AssertSql(
+                @"SELECT ""p"".""Id"", AsBinary(""p"".""Point"") AS ""Binary""
+FROM ""PointEntity"" AS ""p""");
+        }
+
+        public override async Task ToText(bool async)
+        {
+            await base.ToText(async);
+
+            AssertSql(
+                @"SELECT ""p"".""Id"", AsText(""p"".""Point"") AS ""Text""
+FROM ""PointEntity"" AS ""p""");
+        }
+
+        public override async Task Touches(bool async)
+        {
+            await base.Touches(async);
+
+            AssertSql(
+                @"@__polygon_0='0x00010000000000000000000000000000000000000000000000000000F03F0000...' (Size = 116) (DbType = String)
+
+SELECT ""p"".""Id"", CASE
+    WHEN ""p"".""Polygon"" IS NOT NULL THEN Touches(""p"".""Polygon"", @__polygon_0)
+END AS ""Touches""
+FROM ""PolygonEntity"" AS ""p""");
+        }
+
+        public override async Task Union(bool async)
+        {
+            await base.Union(async);
+
+            AssertSql(
+                @"@__polygon_0='0x00010000000000000000000000000000000000000000000000000000F03F0000...' (Size = 116) (DbType = String)
+
+SELECT ""p"".""Id"", GUnion(""p"".""Polygon"", @__polygon_0) AS ""Union""
+FROM ""PolygonEntity"" AS ""p""");
+        }
+
+        public override async Task Union_void(bool async)
+        {
+            await base.Union_void(async);
+
+            AssertSql(
+                @"SELECT ""m"".""Id"", UnaryUnion(""m"".""MultiLineString"") AS ""Union""
+FROM ""MultiLineStringEntity"" AS ""m""");
+        }
+
+        public override async Task Within(bool async)
+        {
+            await base.Within(async);
 
             AssertSql(
                 @"@__polygon_0='0x000100000000000000000000F0BF000000000000F0BF00000000000000400000...' (Size = 132) (DbType = String)
 
-SELECT ""e"".""Id"", Within(""e"".""Point"", @__polygon_0) AS ""Within""
-FROM ""PointEntity"" AS ""e""");
+SELECT ""p"".""Id"", CASE
+    WHEN ""p"".""Point"" IS NOT NULL THEN Within(""p"".""Point"", @__polygon_0)
+END AS ""Within""
+FROM ""PointEntity"" AS ""p""");
         }
 
-        public override async Task X(bool isAsync)
+        public override async Task X(bool async)
         {
-            await base.X(isAsync);
+            await base.X(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", X(""e"".""Point"") AS ""X""
-FROM ""PointEntity"" AS ""e""");
+                @"SELECT ""p"".""Id"", X(""p"".""Point"") AS ""X""
+FROM ""PointEntity"" AS ""p""");
         }
 
-        public override async Task Y(bool isAsync)
+        public override async Task Y(bool async)
         {
-            await base.Y(isAsync);
+            await base.Y(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", Y(""e"".""Point"") AS ""Y""
-FROM ""PointEntity"" AS ""e""");
+                @"SELECT ""p"".""Id"", Y(""p"".""Point"") AS ""Y""
+FROM ""PointEntity"" AS ""p""");
         }
 
-        public override async Task Z(bool isAsync)
+        public override async Task Z(bool async)
         {
-            await base.Z(isAsync);
+            await base.Z(async);
 
             AssertSql(
-                @"SELECT ""e"".""Id"", Z(""e"".""Point"") AS ""Z""
-FROM ""PointEntity"" AS ""e""");
+                @"SELECT ""p"".""Id"", Z(""p"".""Point"") AS ""Z""
+FROM ""PointEntity"" AS ""p""");
+        }
+
+        public override async Task IsEmpty_equal_to_null(bool async)
+        {
+            await base.IsEmpty_equal_to_null(async);
+
+            AssertSql(
+                @"SELECT ""p"".""Id""
+FROM ""PointEntity"" AS ""p""
+WHERE CASE
+    WHEN ""p"".""Point"" IS NOT NULL THEN IsEmpty(""p"".""Point"")
+END IS NULL");
+        }
+
+        public override async Task IsEmpty_not_equal_to_null(bool async)
+        {
+            await base.IsEmpty_not_equal_to_null(async);
+
+            AssertSql(
+                @"SELECT ""p"".""Id""
+FROM ""PointEntity"" AS ""p""
+WHERE CASE
+    WHEN ""p"".""Point"" IS NOT NULL THEN IsEmpty(""p"".""Point"")
+END IS NOT NULL");
+        }
+
+        public override async Task Intersects_equal_to_null(bool async)
+        {
+            await base.Intersects_equal_to_null(async);
+
+            AssertSql(
+                @"@__lineString_0='0x000100000000000000000000E03F000000000000E0BF000000000000E03F0000...' (Size = 80) (DbType = String)
+
+SELECT ""l"".""Id""
+FROM ""LineStringEntity"" AS ""l""
+WHERE CASE
+    WHEN ""l"".""LineString"" IS NOT NULL THEN Intersects(""l"".""LineString"", @__lineString_0)
+END IS NULL",
+                //
+                @"@__lineString_0='0x000100000000000000000000E03F000000000000E0BF000000000000E03F0000...' (Size = 80) (DbType = String)
+
+SELECT ""l"".""Id""
+FROM ""LineStringEntity"" AS ""l""
+WHERE CASE
+    WHEN ""l"".""LineString"" IS NOT NULL THEN Intersects(@__lineString_0, ""l"".""LineString"")
+END IS NULL");
+        }
+
+        public override async Task Intersects_not_equal_to_null(bool async)
+        {
+            await base.Intersects_not_equal_to_null(async);
+
+            AssertSql(
+                @"@__lineString_0='0x000100000000000000000000E03F000000000000E0BF000000000000E03F0000...' (Size = 80) (DbType = String)
+
+SELECT ""l"".""Id""
+FROM ""LineStringEntity"" AS ""l""
+WHERE CASE
+    WHEN ""l"".""LineString"" IS NOT NULL THEN Intersects(""l"".""LineString"", @__lineString_0)
+END IS NOT NULL",
+                //
+                @"@__lineString_0='0x000100000000000000000000E03F000000000000E0BF000000000000E03F0000...' (Size = 80) (DbType = String)
+
+SELECT ""l"".""Id""
+FROM ""LineStringEntity"" AS ""l""
+WHERE CASE
+    WHEN ""l"".""LineString"" IS NOT NULL THEN Intersects(@__lineString_0, ""l"".""LineString"")
+END IS NOT NULL");
         }
 
         private void AssertSql(params string[] expected)
             => Fixture.TestSqlLoggerFactory.AssertBaseline(expected);
     }
-#endif
 }

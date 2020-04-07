@@ -2,30 +2,32 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System.Threading;
-using GeoAPI;
-using GeoAPI.Geometries;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.TestUtilities;
+using Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal;
+using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.EntityFrameworkCore.TestModels.SpatialModel;
 using Microsoft.Extensions.DependencyInjection;
 using NetTopologySuite;
+using NetTopologySuite.Geometries;
 
 namespace Microsoft.EntityFrameworkCore.Query
 {
-#if !Test21
-    public class SpatialQuerySqlServerGeographyFixture : SpatialQueryRelationalFixture
+    public class SpatialQuerySqlServerGeographyFixture : SpatialQuerySqlServerFixture
     {
-        private IGeometryServices _geometryServices;
-        private IGeometryFactory _geometryFactory;
+        private NtsGeometryServices _geometryServices;
+        private GeometryFactory _geometryFactory;
 
-        public IGeometryServices GeometryServices
+        public NtsGeometryServices GeometryServices
             => LazyInitializer.EnsureInitialized(
                 ref _geometryServices,
-                () => new NtsGeometryServices(
-                    NtsGeometryServices.Instance.DefaultCoordinateSequenceFactory,
-                    NtsGeometryServices.Instance.DefaultPrecisionModel,
-                    4326));
+                () => CreateGeometryServices());
 
-        public override IGeometryFactory GeometryFactory
+        protected static NtsGeometryServices CreateGeometryServices()
+            => new NtsGeometryServices(
+                NtsGeometryServices.Instance.DefaultCoordinateSequenceFactory,
+                NtsGeometryServices.Instance.DefaultPrecisionModel,
+                4326);
+
+        public override GeometryFactory GeometryFactory
             => LazyInitializer.EnsureInitialized(
                 ref _geometryFactory,
                 () => GeometryServices.CreateGeometryFactory());
@@ -33,21 +35,25 @@ namespace Microsoft.EntityFrameworkCore.Query
         protected override string StoreName
             => "SpatialQueryGeographyTest";
 
-        protected override ITestStoreFactory TestStoreFactory
-            => SqlServerTestStoreFactory.Instance;
-
         protected override IServiceCollection AddServices(IServiceCollection serviceCollection)
-            => base.AddServices(serviceCollection)
-                .AddSingleton(GeometryServices)
-                .AddEntityFrameworkSqlServerNetTopologySuite();
+            => base.AddServices(serviceCollection.AddSingleton(GeometryServices))
+                .AddSingleton<IRelationalTypeMappingSource, ReplacementTypeMappingSource>();
 
-        public override DbContextOptionsBuilder AddOptions(DbContextOptionsBuilder builder)
+        protected class ReplacementTypeMappingSource : SqlServerTypeMappingSource
         {
-            var optionsBuilder = base.AddOptions(builder);
-            new SqlServerDbContextOptionsBuilder(optionsBuilder).UseNetTopologySuite();
+            public ReplacementTypeMappingSource(
+                TypeMappingSourceDependencies dependencies,
+                RelationalTypeMappingSourceDependencies relationalDependencies)
+                : base(dependencies, relationalDependencies)
+            {
+            }
 
-            return optionsBuilder;
+            protected override RelationalTypeMapping FindMapping(in RelationalTypeMappingInfo mappingInfo)
+                => mappingInfo.ClrType == typeof(GeoPoint)
+                    ? ((RelationalTypeMapping)base.FindMapping(typeof(Point))
+                        .Clone(new GeoPointConverter(CreateGeometryServices().CreateGeometryFactory())))
+                    .Clone("geography", null)
+                    : base.FindMapping(mappingInfo);
         }
     }
-#endif
 }

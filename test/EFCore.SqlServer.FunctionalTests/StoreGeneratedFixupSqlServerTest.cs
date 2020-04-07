@@ -9,14 +9,15 @@ using Xunit;
 // ReSharper disable InconsistentNaming
 namespace Microsoft.EntityFrameworkCore
 {
-    public class StoreGeneratedFixupSqlServerTest : StoreGeneratedFixupRelationalTestBase<StoreGeneratedFixupSqlServerTest.StoreGeneratedFixupSqlServerFixture>
+    public class StoreGeneratedFixupSqlServerTest : StoreGeneratedFixupRelationalTestBase<
+        StoreGeneratedFixupSqlServerTest.StoreGeneratedFixupSqlServerFixture>
     {
         public StoreGeneratedFixupSqlServerTest(StoreGeneratedFixupSqlServerFixture fixture)
             : base(fixture)
         {
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Temp_values_are_replaced_on_save()
         {
             ExecuteWithStrategyInTransaction(
@@ -41,6 +42,14 @@ namespace Microsoft.EntityFrameworkCore
             var entry = context.Entry(dependent);
             entry.Property("Id1").IsTemporary = true;
             entry.Property("Id2").IsTemporary = true;
+
+            foreach (var property in entry.Properties)
+            {
+                if (property.Metadata.IsForeignKey())
+                {
+                    property.IsTemporary = true;
+                }
+            }
 
             entry = context.Entry(principal);
             entry.Property("Id1").IsTemporary = true;
@@ -181,9 +190,9 @@ namespace Microsoft.EntityFrameworkCore
                         b.Property(e => e.Id2).ValueGeneratedOnAdd().HasDefaultValueSql("newid()");
                     });
 
-                modelBuilder.Entity<Item>(b => { b.Property(e => e.Id).ValueGeneratedOnAdd(); });
+                modelBuilder.Entity<Item>(b => b.Property(e => e.Id).ValueGeneratedOnAdd());
 
-                modelBuilder.Entity<Game>(b => { b.Property(e => e.Id).ValueGeneratedOnAdd().HasDefaultValueSql("newid()"); });
+                modelBuilder.Entity<Game>(b => b.Property(e => e.Id).ValueGeneratedOnAdd().HasDefaultValueSql("newid()"));
             }
         }
     }

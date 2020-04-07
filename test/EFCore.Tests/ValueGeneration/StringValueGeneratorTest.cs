@@ -10,10 +10,10 @@ namespace Microsoft.EntityFrameworkCore.ValueGeneration
 {
     public class StringValueGeneratorTest
     {
-        [Fact]
+        [ConditionalFact]
         public void Creates_GUID_strings()
         {
-            var generator = new StringValueGenerator(generateTemporaryValues: true);
+            var generator = new StringValueGenerator();
 
             var values = new HashSet<Guid>();
             for (var i = 0; i < 100; i++)
@@ -26,11 +26,10 @@ namespace Microsoft.EntityFrameworkCore.ValueGeneration
             Assert.Equal(100, values.Count);
         }
 
-        [Fact]
-        public void Generates_temp_or_non_temp_values()
+        [ConditionalFact]
+        public void Generates_non_temp_values()
         {
-            Assert.True(new StringValueGenerator(generateTemporaryValues: true).GeneratesTemporaryValues);
-            Assert.False(new StringValueGenerator(generateTemporaryValues: false).GeneratesTemporaryValues);
+            Assert.False(new StringValueGenerator().GeneratesTemporaryValues);
         }
     }
 }

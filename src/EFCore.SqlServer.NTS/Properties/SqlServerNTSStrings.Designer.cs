@@ -4,47 +4,25 @@ using System;
 using System.Reflection;
 using System.Resources;
 using JetBrains.Annotations;
-using Microsoft.EntityFrameworkCore.Diagnostics;
-using Microsoft.Extensions.Logging;
 
 namespace Microsoft.EntityFrameworkCore.SqlServer.Internal
 {
     /// <summary>
-    ///		This API supports the Entity Framework Core infrastructure and is not intended to be used
-    ///     directly from your code. This API may change or be removed in future releases.
+    ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+    ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+    ///     any release. You should only use it directly in your code with extreme caution and knowing that
+    ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
     public static class SqlServerNTSStrings
     {
         private static readonly ResourceManager _resourceManager
-            = new ResourceManager("Microsoft.EntityFrameworkCore.SqlServer.Properties.SqlServerNTSStrings", typeof(SqlServerNTSStrings).GetTypeInfo().Assembly);
+            = new ResourceManager("Microsoft.EntityFrameworkCore.SqlServer.Properties.SqlServerNTSStrings", typeof(SqlServerNTSStrings).Assembly);
 
         /// <summary>
         ///     UseNetTopologySuite requires AddEntityFrameworkSqlServerNetTopologySuite to be called on the internal service provider used.
         /// </summary>
         public static string NTSServicesMissing
             => GetString("NTSServicesMissing");
-
-        /// <summary>
-        ///     The GEOGRAPHY structure received is incomplete and cannot be read.
-        /// </summary>
-        public static string UnexpectedEndOfStream
-            => GetString("UnexpectedEndOfStream");
-
-        /// <summary>
-        ///     Unsupported type: {type}
-        /// </summary>
-        public static string UnexpectedGeographyType([CanBeNull] object type)
-            => string.Format(
-                GetString("UnexpectedGeographyType", nameof(type)),
-                type);
-
-        /// <summary>
-        ///     Version {version} of the GEOGRAPHY structure received. This version isn't supported.
-        /// </summary>
-        public static string UnexpectedGeographyVersion([CanBeNull] object version)
-            => string.Format(
-                GetString("UnexpectedGeographyVersion", nameof(version)),
-                version);
 
         private static string GetString(string name, params string[] formatterNames)
         {
@@ -58,3 +36,4 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Internal
         }
     }
 }
+

@@ -6,18 +6,20 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Diagnostics.Internal;
 using Microsoft.EntityFrameworkCore.Internal;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Scaffolding.Metadata;
+using Microsoft.EntityFrameworkCore.Sqlite.Design.Internal;
+using Microsoft.EntityFrameworkCore.Sqlite.Diagnostics.Internal;
+using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 using Microsoft.EntityFrameworkCore.Storage;
-using Microsoft.EntityFrameworkCore.Storage.Internal;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Xunit;
-using Microsoft.EntityFrameworkCore.Sqlite.Design.Internal;
-using Microsoft.EntityFrameworkCore.Sqlite.Internal;
 
 // ReSharper disable InconsistentNaming
 namespace Microsoft.EntityFrameworkCore.Scaffolding
@@ -32,7 +34,8 @@ namespace Microsoft.EntityFrameworkCore.Scaffolding
             Fixture.ListLoggerFactory.Clear();
         }
 
-        private void Test(string createSql, IEnumerable<string> tables, IEnumerable<string> schemas, Action<DatabaseModel> asserter, string cleanupSql)
+        private void Test(
+            string createSql, IEnumerable<string> tables, IEnumerable<string> schemas, Action<DatabaseModel> asserter, string cleanupSql)
         {
             Fixture.TestStore.ExecuteNonQuery(createSql);
 
@@ -41,21 +44,25 @@ namespace Microsoft.EntityFrameworkCore.Scaffolding
                 // NOTE: You may need to update AddEntityFrameworkDesignTimeServices() too
                 var services = new ServiceCollection()
                     .AddSingleton<TypeMappingSourceDependencies>()
-                    .AddSingleton<RelationalTypeMapperDependencies>()
                     .AddSingleton<RelationalTypeMappingSourceDependencies>()
                     .AddSingleton<ValueConverterSelectorDependencies>()
                     .AddSingleton<DiagnosticSource>(new DiagnosticListener(DbLoggerCategory.Name))
                     .AddSingleton<ILoggingOptions, LoggingOptions>()
+                    .AddSingleton<LoggingDefinitions, SqliteLoggingDefinitions>()
                     .AddSingleton(typeof(IDiagnosticsLogger<>), typeof(DiagnosticsLogger<>))
-                    .AddSingleton<IRelationalTypeMappingSource, FallbackRelationalTypeMappingSource>()
                     .AddSingleton<IValueConverterSelector, ValueConverterSelector>()
-                    .AddSingleton<ILoggerFactory>(Fixture.ListLoggerFactory);
+                    .AddSingleton<ILoggerFactory>(Fixture.ListLoggerFactory)
+                    .AddSingleton<IDbContextLogger, NullDbContextLogger>();
+
                 new SqliteDesignTimeServices().ConfigureDesignTimeServices(services);
+
                 var databaseModelFactory = services
                     .BuildServiceProvider()
                     .GetRequiredService<IDatabaseModelFactory>();
 
-                var databaseModel = databaseModelFactory.Create(Fixture.TestStore.ConnectionString, tables, schemas);
+                var databaseModel = databaseModelFactory.Create(
+                    Fixture.TestStore.ConnectionString,
+                    new DatabaseModelFactoryOptions(tables, schemas));
                 Assert.NotNull(databaseModel);
                 asserter(databaseModel);
             }
@@ -70,12 +77,12 @@ namespace Microsoft.EntityFrameworkCore.Scaffolding
 
         #region FilteringSchemaTable
 
-        [Fact]
+        [ConditionalFact]
         public void Filter_tables()
         {
             Test(
                 @"
-CREATE TABLE Everest ( id int );  
+CREATE TABLE Everest ( id int );
 CREATE TABLE Denali ( id int );",
                 new[] { "Everest" },
                 Enumerable.Empty<string>(),
@@ -91,12 +98,12 @@ DROP TABLE Everest;
 DROP TABLE Denali;");
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Filter_tables_is_case_insensitive()
         {
             Test(
                 @"
-CREATE TABLE Everest ( id int );  
+CREATE TABLE Everest ( id int );
 CREATE TABLE Denali ( id int );",
                 new[] { "eVeReSt" },
                 Enumerable.Empty<string>(),
@@ -116,12 +123,12 @@ DROP TABLE Denali;");
 
         #region Table
 
-        [Fact]
+        [ConditionalFact]
         public void Create_tables()
         {
             Test(
                 @"
-CREATE TABLE Everest ( id int );  
+CREATE TABLE Everest ( id int );
 CREATE TABLE Denali ( id int );",
                 Enumerable.Empty<string>(),
                 Enumerable.Empty<string>(),
@@ -137,7 +144,7 @@ DROP TABLE Everest;
 DROP TABLE Denali;");
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Create_columns()
         {
             Test(
@@ -154,19 +161,46 @@ CREATE TABLE MountainsColumns (
 
                     Assert.Equal(2, table.Columns.Count);
                     Assert.All(
-                        table.Columns, c => { Assert.Equal("MountainsColumns", c.Table.Name); });
+                        table.Columns, c => Assert.Equal("MountainsColumns", c.Table.Name));
 
                     Assert.Single(table.Columns.Where(c => c.Name == "Id"));
                     Assert.Single(table.Columns.Where(c => c.Name == "Name"));
                 },
-                @"DROP TABLE MountainsColumns;");
+                "DROP TABLE MountainsColumns;");
         }
 
-        [Fact]
+        [ConditionalFact]
+        public void Create_view_columns()
+        {
+            Test(
+                @"
+CREATE VIEW MountainsColumnsView
+ AS
+SELECT
+ CAST(100 AS integer) AS Id,
+ CAST('' AS text) AS Name;",
+                Enumerable.Empty<string>(),
+                Enumerable.Empty<string>(),
+                dbModel =>
+                {
+                    var table = Assert.IsType<DatabaseView>(dbModel.Tables.Single());
+
+                    Assert.Equal(2, table.Columns.Count);
+                    Assert.Null(table.PrimaryKey);
+                    Assert.All(
+                        table.Columns, c => Assert.Equal("MountainsColumnsView", c.Table.Name));
+
+                    Assert.Single(table.Columns.Where(c => c.Name == "Id"));
+                    Assert.Single(table.Columns.Where(c => c.Name == "Name"));
+                },
+                "DROP VIEW MountainsColumnsView;");
+        }
+
+        [ConditionalFact]
         public void Create_primary_key()
         {
             Test(
-                @"CREATE TABLE Place ( Id int PRIMARY KEY );",
+                "CREATE TABLE Place ( Id int PRIMARY KEY );",
                 Enumerable.Empty<string>(),
                 Enumerable.Empty<string>(),
                 dbModel =>
@@ -175,22 +209,19 @@ CREATE TABLE MountainsColumns (
 
                     Assert.Equal("Place", pk.Table.Name);
                     Assert.Equal(
-                        new List<string>
-                        {
-                            "Id"
-                        }, pk.Columns.Select(ic => ic.Name).ToList());
+                        new List<string> { "Id" }, pk.Columns.Select(ic => ic.Name).ToList());
                 },
-                @"DROP TABLE Place;");
+                "DROP TABLE Place;");
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Create_unique_constraints()
         {
             Test(
                 @"
-CREATE TABLE Place ( 
-    Id int PRIMARY KEY, 
-    Name int UNIQUE, 
+CREATE TABLE Place (
+    Id int PRIMARY KEY,
+    Name int UNIQUE,
     Location int
 );
 
@@ -204,15 +235,12 @@ CREATE INDEX IX_Location_Name ON Place (Location, Name);",
                     // ReSharper disable once PossibleNullReferenceException
                     Assert.Equal("Place", uniqueConstraint.Table.Name);
                     Assert.Equal(
-                        new List<string>
-                        {
-                            "Name"
-                        }, uniqueConstraint.Columns.Select(ic => ic.Name).ToList());
+                        new List<string> { "Name" }, uniqueConstraint.Columns.Select(ic => ic.Name).ToList());
                 },
-                @"DROP TABLE Place;");
+                "DROP TABLE Place;");
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Create_indexes()
         {
             Test(
@@ -233,15 +261,15 @@ CREATE INDEX IX_INDEX on IndexTable ( IndexProperty );",
 
                     Assert.Equal(2, table.Indexes.Count);
                     Assert.All(
-                        table.Indexes, c => { Assert.Equal("IndexTable", c.Table.Name); });
+                        table.Indexes, c => Assert.Equal("IndexTable", c.Table.Name));
 
                     Assert.Single(table.Indexes.Where(c => c.Name == "IX_NAME"));
                     Assert.Single(table.Indexes.Where(c => c.Name == "IX_INDEX"));
                 },
-                @"DROP TABLE IndexTable;");
+                "DROP TABLE IndexTable;");
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Create_foreign_keys()
         {
             Test(
@@ -270,15 +298,9 @@ CREATE TABLE SecondDependent (
                     Assert.Equal("FirstDependent", firstFk.Table.Name);
                     Assert.Equal("PrincipalTable", firstFk.PrincipalTable.Name);
                     Assert.Equal(
-                        new List<string>
-                        {
-                            "ForeignKeyId"
-                        }, firstFk.Columns.Select(ic => ic.Name).ToList());
+                        new List<string> { "ForeignKeyId" }, firstFk.Columns.Select(ic => ic.Name).ToList());
                     Assert.Equal(
-                        new List<string>
-                        {
-                            "Id"
-                        }, firstFk.PrincipalColumns.Select(ic => ic.Name).ToList());
+                        new List<string> { "Id" }, firstFk.PrincipalColumns.Select(ic => ic.Name).ToList());
                     Assert.Equal(ReferentialAction.Cascade, firstFk.OnDelete);
 
                     var secondFk = Assert.Single(dbModel.Tables.Single(t => t.Name == "SecondDependent").ForeignKeys);
@@ -287,15 +309,9 @@ CREATE TABLE SecondDependent (
                     Assert.Equal("SecondDependent", secondFk.Table.Name);
                     Assert.Equal("PrincipalTable", secondFk.PrincipalTable.Name);
                     Assert.Equal(
-                        new List<string>
-                        {
-                            "Id"
-                        }, secondFk.Columns.Select(ic => ic.Name).ToList());
+                        new List<string> { "Id" }, secondFk.Columns.Select(ic => ic.Name).ToList());
                     Assert.Equal(
-                        new List<string>
-                        {
-                            "Id"
-                        }, secondFk.PrincipalColumns.Select(ic => ic.Name).ToList());
+                        new List<string> { "Id" }, secondFk.PrincipalColumns.Select(ic => ic.Name).ToList());
                     Assert.Equal(ReferentialAction.NoAction, secondFk.OnDelete);
                 },
                 @"
@@ -304,11 +320,50 @@ DROP TABLE FirstDependent;
 DROP TABLE PrincipalTable;");
         }
 
+        [ConditionalFact]
+        public void Create_composite_foreign_key_with_default_columns()
+        {
+            Test(
+                @"
+                    CREATE TABLE MinimalFKTest1 (
+                        Id1 INTEGER,
+                        Id2 INTEGER,
+                        Id3 INTEGER,
+                        PRIMARY KEY (Id2, Id3, Id1)
+                    );
+
+                    CREATE TABLE MinimalFKTest2 (
+                        Id3 INTEGER,
+                        Id2 INTEGER,
+                        Id1 INTEGER,
+                        FOREIGN KEY (Id3, Id1, Id2) REFERENCES MinimalFKTest1
+                    )
+                ",
+                Enumerable.Empty<string>(),
+                Enumerable.Empty<string>(),
+                dbModel =>
+                {
+                    Assert.Equal(2, dbModel.Tables.Count);
+
+                    var table = dbModel.Tables.Single(t => t.Name == "MinimalFKTest2");
+
+                    var foreignKey = Assert.Single(table.ForeignKeys);
+                    Assert.Equal(new[] { "Id3", "Id1", "Id2" }, foreignKey.Columns.Select(c => c.Name));
+                    Assert.Equal("MinimalFKTest1", foreignKey.PrincipalTable.Name);
+                    Assert.Equal(new[] { "Id2", "Id3", "Id1" }, foreignKey.PrincipalColumns.Select(c => c.Name));
+
+                },
+                @"
+                    DROP TABLE MinimalFKTest2;
+                    DROP TABLE MinimalFKTest1;
+                ");
+        }
+
         #endregion
 
         #region ColumnFacets
 
-        [Fact]
+        [ConditionalFact]
         public void Column_storetype_is_set()
         {
             Test(
@@ -332,10 +387,10 @@ CREATE TABLE StoreType (
                     Assert.Equal("blob", columns.Single(c => c.Name == "BlobProperty").StoreType);
                     Assert.Equal("randomType", columns.Single(c => c.Name == "RandomProperty").StoreType);
                 },
-                @"DROP TABLE StoreType;");
+                "DROP TABLE StoreType;");
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Column_nullability_is_set()
         {
             Test(
@@ -354,10 +409,10 @@ CREATE TABLE Nullable (
                     Assert.True(columns.Single(c => c.Name == "NullableInt").IsNullable);
                     Assert.False(columns.Single(c => c.Name == "NonNullString").IsNullable);
                 },
-                @"DROP TABLE Nullable;");
+                "DROP TABLE Nullable;");
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Column_default_value_is_set()
         {
             Test(
@@ -378,10 +433,10 @@ CREATE TABLE DefaultValue (
                     Assert.Equal("3.14", columns.Single(c => c.Name == "RealColumn").DefaultValueSql);
                     Assert.Equal("'October 20, 2015 11am'", columns.Single(c => c.Name == "Created").DefaultValueSql);
                 },
-                @"DROP TABLE DefaultValue;");
+                "DROP TABLE DefaultValue;");
         }
 
-        [Theory]
+        [ConditionalTheory]
         [InlineData("DOUBLE NOT NULL DEFAULT 0")]
         [InlineData("FLOAT NOT NULL DEFAULT 0")]
         [InlineData("INT NOT NULL DEFAULT 0")]
@@ -403,11 +458,40 @@ CREATE TABLE DefaultValue (
                 "DROP TABLE DefaultValueClr");
         }
 
+        [ConditionalTheory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void Column_ValueGenerated_is_set(bool autoIncrement)
+        {
+            Test(
+                $@"
+                    CREATE TABLE AutoIncTest (
+                        Id INTEGER PRIMARY KEY {(autoIncrement ? "AUTOINCREMENT" : null)}
+                    )
+                ",
+                Enumerable.Empty<string>(),
+                Enumerable.Empty<string>(),
+                dbModel =>
+                {
+                    var table = Assert.Single(dbModel.Tables);
+                    Assert.Equal("AutoIncTest", table.Name);
+
+                    var column = Assert.Single(table.Columns);
+                    Assert.Equal("Id", column.Name);
+                    Assert.Equal(
+                        autoIncrement
+                            ? ValueGenerated.OnAdd
+                            : default(ValueGenerated?),
+                        column.ValueGenerated);
+                },
+                "DROP TABLE AutoIncTest");
+        }
+
         #endregion
 
         #region PrimaryKeyFacets
 
-        [Fact]
+        [ConditionalFact]
         public void Create_composite_primary_key()
         {
             Test(
@@ -425,17 +509,13 @@ CREATE TABLE CompositePrimaryKey (
 
                     Assert.Equal("CompositePrimaryKey", pk.Table.Name);
                     Assert.Equal(
-                        new List<string>
-                        {
-                            "Id2",
-                            "Id1"
-                        }, pk.Columns.Select(ic => ic.Name).ToList());
+                        new List<string> { "Id2", "Id1" }, pk.Columns.Select(ic => ic.Name).ToList());
                 },
-                @"DROP TABLE CompositePrimaryKey;");
+                "DROP TABLE CompositePrimaryKey;");
         }
 
-        [Fact]
-        public void Create_primary_key_when_integer_primary_key_alised_to_rowid()
+        [ConditionalFact]
+        public void Create_primary_key_when_integer_primary_key_aliased_to_rowid()
         {
             Test(
                 @"
@@ -450,15 +530,12 @@ CREATE TABLE RowidPrimaryKey (
 
                     Assert.Equal("RowidPrimaryKey", pk.Table.Name);
                     Assert.Equal(
-                        new List<string>
-                        {
-                            "Id"
-                        }, pk.Columns.Select(ic => ic.Name).ToList());
+                        new List<string> { "Id" }, pk.Columns.Select(ic => ic.Name).ToList());
                 },
-                @"DROP TABLE RowidPrimaryKey;");
+                "DROP TABLE RowidPrimaryKey;");
         }
 
-        [Fact(Skip = "See issue#8802")]
+        [ConditionalFact(Skip = "See issue#8802")]
         public void Set_name_for_primary_key()
         {
             Test(
@@ -476,19 +553,16 @@ CREATE TABLE PrimaryKeyName (
                     Assert.Equal("PrimaryKeyName", pk.Table.Name);
                     Assert.Equal("PK", pk.Name);
                     Assert.Equal(
-                        new List<string>
-                        {
-                            "Id"
-                        }, pk.Columns.Select(ic => ic.Name).ToList());
+                        new List<string> { "Id" }, pk.Columns.Select(ic => ic.Name).ToList());
                 },
-                @"DROP TABLE PrimaryKeyName;");
+                "DROP TABLE PrimaryKeyName;");
         }
 
         #endregion
 
         #region UniqueConstraintFacets
 
-        [Fact]
+        [ConditionalFact]
         public void Create_composite_unique_constraint()
         {
             Test(
@@ -507,16 +581,12 @@ CREATE TABLE CompositeUniqueConstraint (
                     // ReSharper disable once PossibleNullReferenceException
                     Assert.Equal("CompositeUniqueConstraint", constraint.Table.Name);
                     Assert.Equal(
-                        new List<string>
-                        {
-                            "Id2",
-                            "Id1"
-                        }, constraint.Columns.Select(ic => ic.Name).ToList());
+                        new List<string> { "Id2", "Id1" }, constraint.Columns.Select(ic => ic.Name).ToList());
                 },
-                @"DROP TABLE CompositeUniqueConstraint;");
+                "DROP TABLE CompositeUniqueConstraint;");
         }
 
-        [Fact(Skip = "See issue#8802")]
+        [ConditionalFact(Skip = "See issue#8802")]
         public void Set_name_for_unique_constraint()
         {
             Test(
@@ -535,19 +605,16 @@ CREATE TABLE UniqueConstraintName (
                     Assert.Equal("UniqueConstraintName", constraint.Table.Name);
                     Assert.Equal("UK", constraint.Name);
                     Assert.Equal(
-                        new List<string>
-                        {
-                            "Id"
-                        }, constraint.Columns.Select(ic => ic.Name).ToList());
+                        new List<string> { "Id" }, constraint.Columns.Select(ic => ic.Name).ToList());
                 },
-                @"DROP TABLE UniqueConstraintName;");
+                "DROP TABLE UniqueConstraintName;");
         }
 
         #endregion
 
         #region IndexFacets
 
-        [Fact]
+        [ConditionalFact]
         public void Create_composite_index()
         {
             Test(
@@ -568,16 +635,12 @@ CREATE INDEX IX_COMPOSITE on CompositeIndex (Id2, Id1);",
                     Assert.Equal("CompositeIndex", index.Table.Name);
                     Assert.Equal("IX_COMPOSITE", index.Name);
                     Assert.Equal(
-                        new List<string>
-                        {
-                            "Id2",
-                            "Id1"
-                        }, index.Columns.Select(ic => ic.Name).ToList());
+                        new List<string> { "Id2", "Id1" }, index.Columns.Select(ic => ic.Name).ToList());
                 },
-                @"DROP TABLE CompositeIndex;");
+                "DROP TABLE CompositeIndex;");
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Set_unique_for_unique_index()
         {
             Test(
@@ -599,19 +662,16 @@ CREATE UNIQUE INDEX IX_UNIQUE on UniqueIndex (Id2);",
                     Assert.Equal("IX_UNIQUE", index.Name);
                     Assert.True(index.IsUnique);
                     Assert.Equal(
-                        new List<string>
-                        {
-                            "Id2"
-                        }, index.Columns.Select(ic => ic.Name).ToList());
+                        new List<string> { "Id2" }, index.Columns.Select(ic => ic.Name).ToList());
                 },
-                @"DROP TABLE UniqueIndex;");
+                "DROP TABLE UniqueIndex;");
         }
 
         #endregion
 
         #region ForeignKeyFacets
 
-        [Fact]
+        [ConditionalFact]
         public void Create_composite_foreign_key()
         {
             Test(
@@ -638,17 +698,9 @@ CREATE TABLE DependentTable (
                     Assert.Equal("DependentTable", fk.Table.Name);
                     Assert.Equal("PrincipalTable", fk.PrincipalTable.Name);
                     Assert.Equal(
-                        new List<string>
-                        {
-                            "ForeignKeyId1",
-                            "ForeignKeyId2"
-                        }, fk.Columns.Select(ic => ic.Name).ToList());
+                        new List<string> { "ForeignKeyId1", "ForeignKeyId2" }, fk.Columns.Select(ic => ic.Name).ToList());
                     Assert.Equal(
-                        new List<string>
-                        {
-                            "Id1",
-                            "Id2"
-                        }, fk.PrincipalColumns.Select(ic => ic.Name).ToList());
+                        new List<string> { "Id1", "Id2" }, fk.PrincipalColumns.Select(ic => ic.Name).ToList());
                     Assert.Equal(ReferentialAction.Cascade, fk.OnDelete);
                 },
                 @"
@@ -656,7 +708,7 @@ DROP TABLE DependentTable;
 DROP TABLE PrincipalTable;");
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Create_multiple_foreign_key_in_same_table()
         {
             Test(
@@ -690,15 +742,9 @@ CREATE TABLE DependentTable (
                     Assert.Equal("DependentTable", principalFk.Table.Name);
                     Assert.Equal("PrincipalTable", principalFk.PrincipalTable.Name);
                     Assert.Equal(
-                        new List<string>
-                        {
-                            "ForeignKeyId1"
-                        }, principalFk.Columns.Select(ic => ic.Name).ToList());
+                        new List<string> { "ForeignKeyId1" }, principalFk.Columns.Select(ic => ic.Name).ToList());
                     Assert.Equal(
-                        new List<string>
-                        {
-                            "Id"
-                        }, principalFk.PrincipalColumns.Select(ic => ic.Name).ToList());
+                        new List<string> { "Id" }, principalFk.PrincipalColumns.Select(ic => ic.Name).ToList());
                     Assert.Equal(ReferentialAction.Cascade, principalFk.OnDelete);
 
                     var anotherPrincipalFk = Assert.Single(foreignKeys.Where(f => f.PrincipalTable.Name == "AnotherPrincipalTable"));
@@ -707,15 +753,9 @@ CREATE TABLE DependentTable (
                     Assert.Equal("DependentTable", anotherPrincipalFk.Table.Name);
                     Assert.Equal("AnotherPrincipalTable", anotherPrincipalFk.PrincipalTable.Name);
                     Assert.Equal(
-                        new List<string>
-                        {
-                            "ForeignKeyId2"
-                        }, anotherPrincipalFk.Columns.Select(ic => ic.Name).ToList());
+                        new List<string> { "ForeignKeyId2" }, anotherPrincipalFk.Columns.Select(ic => ic.Name).ToList());
                     Assert.Equal(
-                        new List<string>
-                        {
-                            "Id"
-                        }, anotherPrincipalFk.PrincipalColumns.Select(ic => ic.Name).ToList());
+                        new List<string> { "Id" }, anotherPrincipalFk.PrincipalColumns.Select(ic => ic.Name).ToList());
                     Assert.Equal(ReferentialAction.Cascade, anotherPrincipalFk.OnDelete);
                 },
                 @"
@@ -724,7 +764,7 @@ DROP TABLE AnotherPrincipalTable;
 DROP TABLE PrincipalTable;");
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Create_foreign_key_referencing_unique_constraint()
         {
             Test(
@@ -749,15 +789,9 @@ CREATE TABLE DependentTable (
                     Assert.Equal("DependentTable", fk.Table.Name);
                     Assert.Equal("PrincipalTable", fk.PrincipalTable.Name);
                     Assert.Equal(
-                        new List<string>
-                        {
-                            "ForeignKeyId"
-                        }, fk.Columns.Select(ic => ic.Name).ToList());
+                        new List<string> { "ForeignKeyId" }, fk.Columns.Select(ic => ic.Name).ToList());
                     Assert.Equal(
-                        new List<string>
-                        {
-                            "Id2"
-                        }, fk.PrincipalColumns.Select(ic => ic.Name).ToList());
+                        new List<string> { "Id2" }, fk.PrincipalColumns.Select(ic => ic.Name).ToList());
                     Assert.Equal(ReferentialAction.Cascade, fk.OnDelete);
                 },
                 @"
@@ -765,7 +799,7 @@ DROP TABLE DependentTable;
 DROP TABLE PrincipalTable;");
         }
 
-        [Fact(Skip = "See issue#8802")]
+        [ConditionalFact(Skip = "See issue#8802")]
         public void Set_name_for_foreign_key()
         {
             Test(
@@ -789,15 +823,9 @@ CREATE TABLE DependentTable (
                     Assert.Equal("DependentTable", fk.Table.Name);
                     Assert.Equal("PrincipalTable", fk.PrincipalTable.Name);
                     Assert.Equal(
-                        new List<string>
-                        {
-                            "ForeignKeyId"
-                        }, fk.Columns.Select(ic => ic.Name).ToList());
+                        new List<string> { "ForeignKeyId" }, fk.Columns.Select(ic => ic.Name).ToList());
                     Assert.Equal(
-                        new List<string>
-                        {
-                            "Id"
-                        }, fk.PrincipalColumns.Select(ic => ic.Name).ToList());
+                        new List<string> { "Id" }, fk.PrincipalColumns.Select(ic => ic.Name).ToList());
                     Assert.Equal(ReferentialAction.Cascade, fk.OnDelete);
                     Assert.Equal("MYFK", fk.Name);
                 },
@@ -806,7 +834,7 @@ DROP TABLE DependentTable;
 DROP TABLE PrincipalTable;");
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Set_referential_action_for_foreign_key()
         {
             Test(
@@ -830,15 +858,9 @@ CREATE TABLE DependentTable (
                     Assert.Equal("DependentTable", fk.Table.Name);
                     Assert.Equal("PrincipalTable", fk.PrincipalTable.Name);
                     Assert.Equal(
-                        new List<string>
-                        {
-                            "ForeignKeyId"
-                        }, fk.Columns.Select(ic => ic.Name).ToList());
+                        new List<string> { "ForeignKeyId" }, fk.Columns.Select(ic => ic.Name).ToList());
                     Assert.Equal(
-                        new List<string>
-                        {
-                            "Id"
-                        }, fk.PrincipalColumns.Select(ic => ic.Name).ToList());
+                        new List<string> { "Id" }, fk.PrincipalColumns.Select(ic => ic.Name).ToList());
                     Assert.Equal(ReferentialAction.SetNull, fk.OnDelete);
                 },
                 @"
@@ -850,28 +872,30 @@ DROP TABLE PrincipalTable;");
 
         #region Warnings
 
-        [Fact]
+        [ConditionalFact]
         public void Warn_for_schema_filtering()
         {
             Test(
-                @"CREATE TABLE Everest ( id int );",
+                "CREATE TABLE Everest ( id int );",
                 Enumerable.Empty<string>(),
                 new[] { "dbo" },
                 dbModel =>
                 {
                     var (_, Id, Message, _, _) = Assert.Single(Fixture.ListLoggerFactory.Log.Where(t => t.Level == LogLevel.Warning));
 
-                    Assert.Equal(SqliteStrings.LogUsingSchemaSelectionsWarning.EventId, Id);
-                    Assert.Equal(SqliteStrings.LogUsingSchemaSelectionsWarning.GenerateMessage(), Message);
+                    Assert.Equal(SqliteResources.LogUsingSchemaSelectionsWarning(new TestLogger<SqliteLoggingDefinitions>()).EventId, Id);
+                    Assert.Equal(
+                        SqliteResources.LogUsingSchemaSelectionsWarning(new TestLogger<SqliteLoggingDefinitions>()).GenerateMessage(),
+                        Message);
                 },
-                @"DROP TABLE Everest;");
+                "DROP TABLE Everest;");
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Warn_missing_table()
         {
             Test(
-                @"CREATE TABLE Blank ( Id int );",
+                "CREATE TABLE Blank ( Id int );",
                 new[] { "MyTable" },
                 Enumerable.Empty<string>(),
                 dbModel =>
@@ -880,13 +904,14 @@ DROP TABLE PrincipalTable;");
 
                     var (Level, Id, Message, _, _) = Assert.Single(Fixture.ListLoggerFactory.Log.Where(t => t.Level == LogLevel.Warning));
 
-                    Assert.Equal(SqliteStrings.LogMissingTable.EventId, Id);
-                    Assert.Equal(SqliteStrings.LogMissingTable.GenerateMessage("MyTable"), Message);
+                    Assert.Equal(SqliteResources.LogMissingTable(new TestLogger<SqliteLoggingDefinitions>()).EventId, Id);
+                    Assert.Equal(
+                        SqliteResources.LogMissingTable(new TestLogger<SqliteLoggingDefinitions>()).GenerateMessage("MyTable"), Message);
                 },
-                @"DROP TABLE Blank;");
+                "DROP TABLE Blank;");
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Warn_missing_principal_table_for_foreign_key()
         {
             Test(
@@ -906,15 +931,19 @@ CREATE TABLE DependentTable (
                 {
                     var (_, Id, Message, _, _) = Assert.Single(Fixture.ListLoggerFactory.Log.Where(t => t.Level == LogLevel.Warning));
 
-                    Assert.Equal(SqliteStrings.LogForeignKeyScaffoldErrorPrincipalTableNotFound.EventId, Id);
-                    Assert.Equal(SqliteStrings.LogForeignKeyScaffoldErrorPrincipalTableNotFound.GenerateMessage("0"), Message);
+                    Assert.Equal(
+                        SqliteResources.LogForeignKeyScaffoldErrorPrincipalTableNotFound(new TestLogger<SqliteLoggingDefinitions>())
+                            .EventId, Id);
+                    Assert.Equal(
+                        SqliteResources.LogForeignKeyScaffoldErrorPrincipalTableNotFound(new TestLogger<SqliteLoggingDefinitions>())
+                            .GenerateMessage("0"), Message);
                 },
                 @"
 DROP TABLE DependentTable;
 DROP TABLE PrincipalTable;");
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Warn_missing_principal_column_for_foreign_key()
         {
             Test(
@@ -934,8 +963,11 @@ CREATE TABLE DependentTable (
                 {
                     var (_, Id, Message, _, _) = Assert.Single(Fixture.ListLoggerFactory.Log.Where(t => t.Level == LogLevel.Warning));
 
-                    Assert.Equal(SqliteStrings.LogPrincipalColumnNotFound.EventId, Id);
-                    Assert.Equal(SqliteStrings.LogPrincipalColumnNotFound.GenerateMessage("0", "DependentTable", "ImaginaryId", "PrincipalTable"), Message);
+                    Assert.Equal(SqliteResources.LogPrincipalColumnNotFound(new TestLogger<SqliteLoggingDefinitions>()).EventId, Id);
+                    Assert.Equal(
+                        SqliteResources.LogPrincipalColumnNotFound(new TestLogger<SqliteLoggingDefinitions>()).GenerateMessage(
+                            "0", "DependentTable", "ImaginaryId", "PrincipalTable"),
+                        Message);
                 },
                 @"
 DROP TABLE DependentTable;

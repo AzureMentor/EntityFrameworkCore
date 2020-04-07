@@ -2,11 +2,16 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Data.SqlTypes;
+using System.Linq.Expressions;
+using System.Numerics;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.EntityFrameworkCore.TestUtilities.Xunit;
+using Microsoft.SqlServer.Types;
 using Xunit;
 
 namespace Microsoft.EntityFrameworkCore.Design.Internal
@@ -15,7 +20,7 @@ namespace Microsoft.EntityFrameworkCore.Design.Internal
     {
         private static readonly string EOL = Environment.NewLine;
 
-        [Theory]
+        [ConditionalTheory]
         [InlineData(
             "single-line string with \"",
             "\"single-line string with \\\"\"")]
@@ -106,115 +111,120 @@ namespace Microsoft.EntityFrameworkCore.Design.Internal
             Assert.Equal(expected, literal);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Literal_works_when_empty_ByteArray() =>
             Literal_works(
                 Array.Empty<byte>(),
-                "new byte[] {  }");
+                "new byte[0]");
 
-        [Fact]
+        [ConditionalFact]
         public void Literal_works_when_single_ByteArray() =>
             Literal_works(
                 new byte[] { 1 },
                 "new byte[] { 1 }");
 
-        [Fact]
+        [ConditionalFact]
         public void Literal_works_when_many_ByteArray() =>
             Literal_works(
                 new byte[] { 1, 2 },
                 "new byte[] { 1, 2 }");
 
-        [Fact]
+        [ConditionalFact]
         public void Literal_works_when_multiline_string() =>
             Literal_works(
                 "multi-line" + Environment.NewLine + "string with \"",
                 "@\"multi-line" + Environment.NewLine + "string with \"\"\"");
 
-        [Fact]
+        [ConditionalFact]
         [UseCulture("de-DE")]
         public void Literal_works_when_DateTime() =>
             Literal_works(
                 new DateTime(2015, 3, 15, 20, 45, 17, 300, DateTimeKind.Local),
                 "new DateTime(2015, 3, 15, 20, 45, 17, 300, DateTimeKind.Local)");
 
-        [Fact]
+        [ConditionalFact]
         [UseCulture("de-DE")]
         public void Literal_works_when_DateTimeOffset() =>
             Literal_works(
                 new DateTimeOffset(new DateTime(2015, 3, 15, 19, 43, 47, 500), new TimeSpan(-7, 0, 0)),
                 "new DateTimeOffset(new DateTime(2015, 3, 15, 19, 43, 47, 500, DateTimeKind.Unspecified), new TimeSpan(0, -7, 0, 0, 0))");
 
-        [Fact]
+        [ConditionalFact]
         public void Literal_works_when_decimal() =>
             Literal_works(
                 4.2m,
                 "4.2m");
 
-        [Fact]
+        [ConditionalFact]
         public void Literal_works_when_decimal_max_value() =>
             Literal_works(
                 79228162514264337593543950335m, // Decimal MaxValue
                 "79228162514264337593543950335m");
 
-        [Fact]
+        [ConditionalFact]
         public void Literal_works_when_decimal_min_value() =>
             Literal_works(
                 -79228162514264337593543950335m, // Decimal MinValue
                 "-79228162514264337593543950335m");
 
-        [Fact]
+        [ConditionalFact]
         public void Literal_works_when_Guid() =>
             Literal_works(
                 new Guid("fad4f3c3-9501-4b3a-af99-afeb496f7664"),
                 "new Guid(\"fad4f3c3-9501-4b3a-af99-afeb496f7664\")");
 
-        [Fact]
+        [ConditionalFact]
         public void Literal_works_when_TimeSpan() =>
             Literal_works(
                 new TimeSpan(17, 21, 42, 37, 250),
                 "new TimeSpan(17, 21, 42, 37, 250)");
 
-        [Fact]
+        [ConditionalFact]
         public void Literal_works_when_NullableInt() =>
             Literal_works(
                 (int?)42,
                 "42");
 
-        [Fact]
+        [ConditionalFact]
         public void Literal_works_when_StringArray()
         {
             var literal = new CSharpHelper(TypeMappingSource).Literal(new[] { "A", "B" });
             Assert.Equal("new[] { \"A\", \"B\" }", literal);
         }
 
-        [Fact]
+        [ConditionalFact]
+        public void Literal_works_when_empty_StringArray()
+        {
+            var literal = new CSharpHelper(TypeMappingSource).Literal(new string[] { });
+            Assert.Equal("new string[0]", literal);
+        }
+
+        [ConditionalFact]
         public void Literal_works_when_ObjectArray()
         {
             var literal = new CSharpHelper(TypeMappingSource).Literal(new object[] { 'A', 1 });
             Assert.Equal("new object[] { 'A', 1 }", literal);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Literal_works_when_MultidimensionalArray()
         {
-            var value = new object[,]
-            {
-                { 'A', 1 },
-                { 'B', 2 }
-            };
+            var value = new object[,] { { 'A', 1 }, { 'B', 2 } };
 
             var result = new CSharpHelper(TypeMappingSource).Literal(value);
 
             Assert.Equal(
-                "new object[,]" + EOL +
-                "{" + EOL +
-                "    { 'A', 1 }," + EOL +
-                "    { 'B', 2 }" + EOL +
-                "}",
+                "new object[,]" + EOL + "{" + EOL + "    { 'A', 1 }," + EOL + "    { 'B', 2 }" + EOL + "}",
                 result);
         }
 
-        [Fact]
+        [ConditionalFact]
+        public void Literal_works_when_BigInteger() =>
+            Literal_works(
+                new BigInteger(42),
+                "BigInteger.Parse(\"42\", NumberFormatInfo.InvariantInfo)");
+
+        [ConditionalFact]
         public void UnknownLiteral_throws_when_unknown()
         {
             var ex = Assert.Throws<InvalidOperationException>(
@@ -222,7 +232,7 @@ namespace Microsoft.EntityFrameworkCore.Design.Internal
             Assert.Equal(DesignStrings.UnknownLiteral(typeof(object)), ex.Message);
         }
 
-        [Theory]
+        [ConditionalTheory]
         [InlineData(typeof(int), "int")]
         [InlineData(typeof(int?), "int?")]
         [InlineData(typeof(int[]), "int[]")]
@@ -253,7 +263,7 @@ namespace Microsoft.EntityFrameworkCore.Design.Internal
             Default
         }
 
-        [Theory]
+        [ConditionalTheory]
         [InlineData("dash-er", "dasher")]
         [InlineData("params", "@params")]
         [InlineData("true", "@true")]
@@ -267,7 +277,7 @@ namespace Microsoft.EntityFrameworkCore.Design.Internal
             Assert.Equal(expected, new CSharpHelper(TypeMappingSource).Identifier(input));
         }
 
-        [Theory]
+        [ConditionalTheory]
         [InlineData(new[] { "WebApplication1", "Migration" }, "WebApplication1.Migration")]
         [InlineData(new[] { "WebApplication1.Migration" }, "WebApplication1.Migration")]
         [InlineData(new[] { "ef-xplat.namespace" }, "efxplat.@namespace")]
@@ -280,7 +290,7 @@ namespace Microsoft.EntityFrameworkCore.Design.Internal
             Assert.Equal(excepted, new CSharpHelper(TypeMappingSource).Namespace(input));
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Fragment_MethodCallCodeFragment_works()
         {
             var method = new MethodCallCodeFragment("Test", true, 42);
@@ -290,7 +300,7 @@ namespace Microsoft.EntityFrameworkCore.Design.Internal
             Assert.Equal(".Test(true, 42)", result);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Fragment_MethodCallCodeFragment_works_with_arrays()
         {
             var method = new MethodCallCodeFragment("Test", new byte[] { 1, 2 }, new[] { 3, 4 }, new[] { "foo", "bar" });
@@ -300,7 +310,7 @@ namespace Microsoft.EntityFrameworkCore.Design.Internal
             Assert.Equal(".Test(new byte[] { 1, 2 }, new[] { 3, 4 }, new[] { \"foo\", \"bar\" })", result);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Fragment_MethodCallCodeFragment_works_when_niladic()
         {
             var method = new MethodCallCodeFragment("Test");
@@ -310,7 +320,7 @@ namespace Microsoft.EntityFrameworkCore.Design.Internal
             Assert.Equal(".Test()", result);
         }
 
-        [Fact]
+        [ConditionalFact]
         public void Fragment_MethodCallCodeFragment_works_when_chaining()
         {
             var method = new MethodCallCodeFragment("Test")
@@ -321,7 +331,29 @@ namespace Microsoft.EntityFrameworkCore.Design.Internal
             Assert.Equal(".Test().Test()", result);
         }
 
-        [Fact]
+        [ConditionalFact]
+        public void Fragment_MethodCallCodeFragment_works_when_chaining_on_chain()
+        {
+            var method = new MethodCallCodeFragment("One", Array.Empty<object>(), new MethodCallCodeFragment("Two"))
+                .Chain("Three");
+
+            var result = new CSharpHelper(TypeMappingSource).Fragment(method);
+
+            Assert.Equal(".One().Two().Three()", result);
+        }
+
+        [ConditionalFact]
+        public void Fragment_MethodCallCodeFragment_works_when_chaining_on_chain_with_call()
+        {
+            var method = new MethodCallCodeFragment("One", Array.Empty<object>(), new MethodCallCodeFragment("Two"))
+                .Chain(new MethodCallCodeFragment("Three", Array.Empty<object>(), new MethodCallCodeFragment("Four")));
+
+            var result = new CSharpHelper(TypeMappingSource).Fragment(method);
+
+            Assert.Equal(".One().Two().Three().Four()", result);
+        }
+
+        [ConditionalFact]
         public void Fragment_MethodCallCodeFragment_works_when_nested_closure()
         {
             var method = new MethodCallCodeFragment(
@@ -333,10 +365,400 @@ namespace Microsoft.EntityFrameworkCore.Design.Internal
             Assert.Equal(".Test(x => x.Test())", result);
         }
 
-        private IRelationalTypeMappingSource TypeMappingSource { get; }
-            = new SqlServerTypeMappingSource(
+        [ConditionalFact]
+        public void Really_unknown_literal_with_no_mapping_support()
+        {
+            var typeMapping = CreateTypeMappingSource<SimpleTestType>(null);
+
+            Assert.Equal(
+                CoreStrings.LiteralGenerationNotSupported(nameof(SimpleTestType)),
+                Assert.Throws<NotSupportedException>(
+                    () => new CSharpHelper(typeMapping).UnknownLiteral(new SimpleTestType())).Message);
+        }
+
+        [ConditionalFact]
+        public void Literal_with_parameterless_constructor()
+        {
+            var typeMapping = CreateTypeMappingSource<SimpleTestType>(
+                v => Expression.New(typeof(SimpleTestType)));
+
+            Assert.Equal(
+                "new Microsoft.EntityFrameworkCore.Design.Internal.SimpleTestType()",
+                new CSharpHelper(typeMapping).UnknownLiteral(new SimpleTestType()));
+        }
+
+        [ConditionalFact]
+        public void Literal_with_one_parameter_constructor()
+        {
+            var typeMapping = CreateTypeMappingSource<SimpleTestType>(
+                v => Expression.New(
+                    typeof(SimpleTestType).GetConstructor(new[] { typeof(string) }),
+                    Expression.Constant(v.Arg1, typeof(string))));
+
+            Assert.Equal(
+                "new Microsoft.EntityFrameworkCore.Design.Internal.SimpleTestType(\"Jerry\")",
+                new CSharpHelper(typeMapping).UnknownLiteral(new SimpleTestType("Jerry")));
+        }
+
+        [ConditionalFact]
+        public void Literal_with_two_parameter_constructor()
+        {
+            var typeMapping = CreateTypeMappingSource<SimpleTestType>(
+                v => Expression.New(
+                    typeof(SimpleTestType).GetConstructor(new[] { typeof(string), typeof(int?) }),
+                    Expression.Constant(v.Arg1, typeof(string)),
+                    Expression.Constant(v.Arg2, typeof(int?))));
+
+            Assert.Equal(
+                "new Microsoft.EntityFrameworkCore.Design.Internal.SimpleTestType(\"Jerry\", 77)",
+                new CSharpHelper(typeMapping).UnknownLiteral(new SimpleTestType("Jerry", 77)));
+        }
+
+        [ConditionalFact]
+        public void Literal_with_parameterless_static_factory()
+        {
+            var typeMapping = CreateTypeMappingSource<SimpleTestType>(
+                v => Expression.Call(
+                    typeof(SimpleTestTypeFactory).GetMethod(
+                        nameof(SimpleTestTypeFactory.StaticCreate),
+                        new Type[0])));
+
+            Assert.Equal(
+                "Microsoft.EntityFrameworkCore.Design.Internal.SimpleTestTypeFactory.StaticCreate()",
+                new CSharpHelper(typeMapping).UnknownLiteral(new SimpleTestType()));
+        }
+
+        [ConditionalFact]
+        public void Literal_with_one_parameter_static_factory()
+        {
+            var typeMapping = CreateTypeMappingSource<SimpleTestType>(
+                v => Expression.Call(
+                    typeof(SimpleTestTypeFactory).GetMethod(
+                        nameof(SimpleTestTypeFactory.StaticCreate),
+                        new[] { typeof(string) }),
+                    Expression.Constant(v.Arg1, typeof(string))));
+
+            Assert.Equal(
+                "Microsoft.EntityFrameworkCore.Design.Internal.SimpleTestTypeFactory.StaticCreate(\"Jerry\")",
+                new CSharpHelper(typeMapping).UnknownLiteral(new SimpleTestType("Jerry")));
+        }
+
+        [ConditionalFact]
+        public void Literal_with_two_parameter_static_factory()
+        {
+            var typeMapping = CreateTypeMappingSource<SimpleTestType>(
+                v => Expression.Call(
+                    typeof(SimpleTestTypeFactory).GetMethod(
+                        nameof(SimpleTestTypeFactory.StaticCreate),
+                        new[] { typeof(string), typeof(int?) }),
+                    Expression.Constant(v.Arg1, typeof(string)),
+                    Expression.Constant(v.Arg2, typeof(int?))));
+
+            Assert.Equal(
+                "Microsoft.EntityFrameworkCore.Design.Internal.SimpleTestTypeFactory.StaticCreate(\"Jerry\", 77)",
+                new CSharpHelper(typeMapping).UnknownLiteral(new SimpleTestType("Jerry", 77)));
+        }
+
+        [ConditionalFact]
+        public void Literal_with_parameterless_instance_factory()
+        {
+            var typeMapping = CreateTypeMappingSource<SimpleTestType>(
+                v => Expression.Call(
+                    Expression.New(typeof(SimpleTestTypeFactory)),
+                    typeof(SimpleTestTypeFactory).GetMethod(
+                        nameof(SimpleTestTypeFactory.Create),
+                        new Type[0])));
+
+            Assert.Equal(
+                "new Microsoft.EntityFrameworkCore.Design.Internal.SimpleTestTypeFactory().Create()",
+                new CSharpHelper(typeMapping).UnknownLiteral(new SimpleTestType()));
+        }
+
+        [ConditionalFact]
+        public void Literal_with_one_parameter_instance_factory()
+        {
+            var typeMapping = CreateTypeMappingSource<SimpleTestType>(
+                v => Expression.Convert(
+                    Expression.Call(
+                        Expression.New(typeof(SimpleTestTypeFactory)),
+                        typeof(SimpleTestTypeFactory).GetMethod(
+                            nameof(SimpleTestTypeFactory.Create),
+                            new[] { typeof(string) }),
+                        Expression.Constant(v.Arg1, typeof(string))),
+                    typeof(SimpleTestType)));
+
+            Assert.Equal(
+                "(Microsoft.EntityFrameworkCore.Design.Internal.SimpleTestType)new Microsoft.EntityFrameworkCore.Design.Internal.SimpleTestTypeFactory().Create(\"Jerry\")",
+                new CSharpHelper(typeMapping).UnknownLiteral(new SimpleTestType("Jerry", 77)));
+        }
+
+        [ConditionalFact]
+        public void Literal_with_two_parameter_instance_factory()
+        {
+            var typeMapping = CreateTypeMappingSource<SimpleTestType>(
+                v => Expression.Convert(
+                    Expression.Call(
+                        Expression.New(
+                            typeof(SimpleTestTypeFactory).GetConstructor(new[] { typeof(string) }),
+                            Expression.Constant("4096", typeof(string))),
+                        typeof(SimpleTestTypeFactory).GetMethod(
+                            nameof(SimpleTestTypeFactory.Create),
+                            new[] { typeof(string), typeof(int?) }),
+                        Expression.Constant(v.Arg1, typeof(string)),
+                        Expression.Constant(v.Arg2, typeof(int?))),
+                    typeof(SimpleTestType)));
+
+            Assert.Equal(
+                "(Microsoft.EntityFrameworkCore.Design.Internal.SimpleTestType)new Microsoft.EntityFrameworkCore.Design.Internal.SimpleTestTypeFactory(\"4096\").Create(\"Jerry\", 77)",
+                new CSharpHelper(typeMapping).UnknownLiteral(new SimpleTestType("Jerry", 77)));
+        }
+
+        [ConditionalFact]
+        public void Literal_with_two_parameter_instance_factory_and_internal_cast()
+        {
+            var typeMapping = CreateTypeMappingSource<SimpleTestType>(
+                v => Expression.Convert(
+                    Expression.Call(
+                        Expression.New(
+                            typeof(SimpleTestTypeFactory).GetConstructor(new[] { typeof(string) }),
+                            Expression.Constant("4096", typeof(string))),
+                        typeof(SimpleTestTypeFactory).GetMethod(
+                            nameof(SimpleTestTypeFactory.Create),
+                            new[] { typeof(string), typeof(int?) }),
+                        Expression.Constant(v.Arg1, typeof(string)),
+                        Expression.Convert(
+                            Expression.Constant(v.Arg2, typeof(int)),
+                            typeof(int?))),
+                    typeof(SimpleTestType)));
+
+            Assert.Equal(
+                "(Microsoft.EntityFrameworkCore.Design.Internal.SimpleTestType)new Microsoft.EntityFrameworkCore.Design.Internal.SimpleTestTypeFactory(\"4096\").Create(\"Jerry\", (int?)77)",
+                new CSharpHelper(typeMapping).UnknownLiteral(new SimpleTestType("Jerry", 77)));
+        }
+
+        [ConditionalFact]
+        public void Literal_with_static_field()
+        {
+            var typeMapping = CreateTypeMappingSource<SimpleTestType>(
+                v => Expression.Field(null, typeof(SimpleTestType).GetField(nameof(SimpleTestType.SomeStaticField))));
+
+            Assert.Equal(
+                "Microsoft.EntityFrameworkCore.Design.Internal.SimpleTestType.SomeStaticField",
+                new CSharpHelper(typeMapping).UnknownLiteral(new SimpleTestType()));
+        }
+
+        [ConditionalFact]
+        public void Literal_with_static_property()
+        {
+            var typeMapping = CreateTypeMappingSource<SimpleTestType>(
+                v => Expression.Property(null, typeof(SimpleTestType).GetProperty(nameof(SimpleTestType.SomeStaticProperty))));
+
+            Assert.Equal(
+                "Microsoft.EntityFrameworkCore.Design.Internal.SimpleTestType.SomeStaticProperty",
+                new CSharpHelper(typeMapping).UnknownLiteral(new SimpleTestType()));
+        }
+
+        [ConditionalFact]
+        public void Literal_with_instance_property()
+        {
+            var typeMapping = CreateTypeMappingSource<SimpleTestType>(
+                v => Expression.Property(
+                    Expression.New(typeof(SimpleTestType)),
+                    typeof(SimpleTestType).GetProperty(nameof(SimpleTestType.SomeInstanceProperty))));
+
+            Assert.Equal(
+                "new Microsoft.EntityFrameworkCore.Design.Internal.SimpleTestType().SomeInstanceProperty",
+                new CSharpHelper(typeMapping).UnknownLiteral(new SimpleTestType()));
+        }
+
+        [ConditionalFact]
+        public void Literal_with_add()
+        {
+            var typeMapping = CreateTypeMappingSource<SimpleTestType>(
+                v => Expression.Add(
+                    Expression.Constant(10),
+                    Expression.Constant(10)));
+
+            Assert.Equal(
+                "10 + 10",
+                new CSharpHelper(typeMapping).UnknownLiteral(new SimpleTestType()));
+        }
+
+        [ConditionalFact]
+        public void Literal_with_unsupported_node_throws()
+        {
+            var typeMapping = CreateTypeMappingSource<SimpleTestType>(
+                v => Expression.Multiply(
+                    Expression.Constant(10),
+                    Expression.Constant(10)));
+
+            Assert.Equal(
+                DesignStrings.LiteralExpressionNotSupported(
+                    "(10 * 10)",
+                    nameof(SimpleTestType)),
+                Assert.Throws<NotSupportedException>(
+                    () => new CSharpHelper(typeMapping).UnknownLiteral(new SimpleTestType())).Message);
+        }
+
+        [ConditionalFact]
+        public virtual void Can_generate_SqlHierarchyId_literal()
+        {
+            var typeMapping = CreateTypeMappingSource(
+                new TestTypeMappingPlugin<FakeSqlHierarchyId>(
+                    SqlServerUdtTypeMapping.CreateSqlHierarchyIdMapping(
+                        typeof(FakeSqlHierarchyId)).LiteralGenerator));
+
+            Assert.Equal(
+                "Microsoft.SqlServer.Types.FakeSqlHierarchyId.Parse(new System.Data.SqlTypes.SqlString(\"/1/1/3/\"))",
+                new CSharpHelper(typeMapping).UnknownLiteral(
+                    FakeSqlHierarchyId.Parse(
+                        new SqlString("/1/1/3/"))));
+        }
+
+        [ConditionalFact]
+        public virtual void Can_generate_SqlGeometry_literal()
+        {
+            var typeMapping = CreateTypeMappingSource(
+                new TestTypeMappingPlugin<FakeSqlGeometry>(
+                    SqlServerUdtTypeMapping.CreateSqlSpatialMapping(
+                            typeof(FakeSqlGeometry),
+                            "geometry")
+                        .LiteralGenerator));
+
+            Assert.Equal(
+                "Microsoft.SqlServer.Types.FakeSqlGeometry.STGeomFromText(new System.Data.SqlTypes.SqlChars(new System.Data.SqlTypes.SqlString(\"POINT (1 2)\")), 0)",
+                new CSharpHelper(typeMapping).UnknownLiteral(new FakeSqlGeometry("POINT (1 2)", 0)));
+        }
+
+        [ConditionalFact]
+        public virtual void Can_generate_SqlGeography_literal()
+        {
+            var typeMapping = CreateTypeMappingSource(
+                new TestTypeMappingPlugin<FakeSqlGeography>(
+                    SqlServerUdtTypeMapping.CreateSqlSpatialMapping(
+                            typeof(FakeSqlGeography),
+                            "geography")
+                        .LiteralGenerator));
+
+            Assert.Equal(
+                "Microsoft.SqlServer.Types.FakeSqlGeography.STGeomFromText(new System.Data.SqlTypes.SqlChars(new System.Data.SqlTypes.SqlString(\"POINT (1 2)\")), 4326)",
+                new CSharpHelper(typeMapping).UnknownLiteral(new FakeSqlGeography("POINT (1 2)", 4326)));
+        }
+
+        private IRelationalTypeMappingSource TypeMappingSource { get; } = CreateTypeMappingSource();
+
+        private static SqlServerTypeMappingSource CreateTypeMappingSource<T>(
+            Func<T, Expression> literalExpressionFunc)
+            => CreateTypeMappingSource(new TestTypeMappingPlugin<T>(literalExpressionFunc));
+
+        private static SqlServerTypeMappingSource CreateTypeMappingSource(
+            params IRelationalTypeMappingSourcePlugin[] plugins)
+            => new SqlServerTypeMappingSource(
                 TestServiceFactory.Instance.Create<TypeMappingSourceDependencies>(),
-                TestServiceFactory.Instance.Create<RelationalTypeMappingSourceDependencies>());
+                new RelationalTypeMappingSourceDependencies(
+                    plugins));
+
+        private class TestTypeMappingPlugin<T> : IRelationalTypeMappingSourcePlugin
+        {
+            private readonly Func<T, Expression> _literalExpressionFunc;
+
+            public TestTypeMappingPlugin(Func<T, Expression> literalExpressionFunc)
+            {
+                _literalExpressionFunc = literalExpressionFunc;
+            }
+
+            public RelationalTypeMapping FindMapping(in RelationalTypeMappingInfo mappingInfo)
+                => _literalExpressionFunc == null
+                    ? (RelationalTypeMapping)new SimpleTestNonImplementedTypeMapping()
+                    : new SimpleTestTypeMapping<T>(_literalExpressionFunc);
+        }
+
+        private class SimpleTestTypeMapping<T> : RelationalTypeMapping
+        {
+            private readonly Func<T, Expression> _literalExpressionFunc;
+
+            public SimpleTestTypeMapping(
+                Func<T, Expression> literalExpressionFunc)
+                : base("storeType", typeof(SimpleTestType))
+            {
+                _literalExpressionFunc = literalExpressionFunc;
+            }
+
+            public override Expression GenerateCodeLiteral(object value)
+                => _literalExpressionFunc((T)value);
+
+            protected override RelationalTypeMapping Clone(RelationalTypeMappingParameters parameters)
+                => throw new NotSupportedException();
+        }
+
+        private class SimpleTestNonImplementedTypeMapping : RelationalTypeMapping
+        {
+            public SimpleTestNonImplementedTypeMapping()
+                : base("storeType", typeof(SimpleTestType))
+            {
+            }
+
+            protected override RelationalTypeMapping Clone(RelationalTypeMappingParameters parameters)
+                => throw new NotSupportedException();
+        }
+    }
+
+    internal class SimpleTestType
+    {
+        public static readonly int SomeStaticField = 8;
+        public readonly int SomeField = 8;
+        public static int SomeStaticProperty { get; } = 8;
+        public int SomeInstanceProperty { get; } = 8;
+
+        public SimpleTestType()
+        {
+        }
+
+        public SimpleTestType(string arg1)
+            : this(arg1, null)
+        {
+        }
+
+        public SimpleTestType(string arg1, int? arg2)
+        {
+            Arg1 = arg1;
+            Arg2 = arg2;
+        }
+
+        public string Arg1 { get; }
+        public int? Arg2 { get; }
+    }
+
+    internal class SimpleTestTypeFactory
+    {
+        public SimpleTestTypeFactory()
+        {
+        }
+
+        public SimpleTestTypeFactory(string factoryArg)
+        {
+            FactoryArg = factoryArg;
+        }
+
+        public string FactoryArg { get; }
+
+        public SimpleTestType Create()
+            => new SimpleTestType();
+
+        public object Create(string arg1)
+            => new SimpleTestType(arg1);
+
+        public object Create(string arg1, int? arg2)
+            => new SimpleTestType(arg1, arg2);
+
+        public static SimpleTestType StaticCreate()
+            => new SimpleTestType();
+
+        public static object StaticCreate(string arg1)
+            => new SimpleTestType(arg1);
+
+        public static object StaticCreate(string arg1, int? arg2)
+            => new SimpleTestType(arg1, arg2);
     }
 
     internal class Generic<T>
@@ -345,5 +767,67 @@ namespace Microsoft.EntityFrameworkCore.Design.Internal
 
     internal class MultiGeneric<T1, T2>
     {
+    }
+}
+
+namespace Microsoft.SqlServer.Types
+{
+    // Has the same shape as Microsoft.SqlServer.Types.SqlHierarchyId for testing code gen
+    public class FakeSqlHierarchyId
+    {
+        private readonly SqlString _value;
+
+        private FakeSqlHierarchyId(SqlString value)
+            => _value = value;
+
+        public static FakeSqlHierarchyId Parse(SqlString input)
+            => new FakeSqlHierarchyId(input);
+
+        public override string ToString()
+            => _value.Value;
+    }
+
+    // Has the same shape as Microsoft.SqlServer.Types.SqlGeometry for testing code gen
+    public class FakeSqlGeometry
+    {
+        private readonly string _text;
+        private readonly int _srid;
+
+        public FakeSqlGeometry(string text, int srid)
+        {
+            _text = text;
+            _srid = srid;
+        }
+
+        public SqlChars AsTextZM() => new SqlChars(_text);
+
+        public SqlInt32 STSrid => _srid;
+
+        public static FakeSqlGeometry STGeomFromText(SqlChars geometryTaggedText, int srid)
+        {
+            return new FakeSqlGeometry(geometryTaggedText.ToSqlString().ToString(), srid);
+        }
+    }
+
+    // Has the same shape as Microsoft.SqlServer.Types.SqlGeography for testing code gen
+    public class FakeSqlGeography
+    {
+        private readonly string _text;
+        private readonly int _srid;
+
+        public FakeSqlGeography(string text, int srid)
+        {
+            _text = text;
+            _srid = srid;
+        }
+
+        public SqlChars AsTextZM() => new SqlChars(_text);
+
+        public SqlInt32 STSrid => _srid;
+
+        public static FakeSqlGeography STGeomFromText(SqlChars geometryTaggedText, int srid)
+        {
+            return new FakeSqlGeography(geometryTaggedText.ToSqlString().ToString(), srid);
+        }
     }
 }
